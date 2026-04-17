@@ -773,11 +773,12 @@ function renderDashboard(d) {
   // Pick the right period
   let sales, checks, label;
   if (currentFilter === 'yesterday') {
-    const last14 = d.last14Days || [];
-    const yest = last14[0] || {};
+    const todayStr = new Date().toISOString().slice(0,10);
+    const realDays = (d.last14Days || []).filter(r => r.date <= todayStr && r.checks > 5);
+    const yest = realDays[0] || {};
     sales  = yest.sales  || 0;
     checks = yest.checks || 0;
-    label  = yest.date   ? 'Yesterday · ' + fmtDate(yest.date) : 'Yesterday';
+    label  = yest.date   ? fmtDate(yest.date) : 'Yesterday';
   } else if (currentFilter === 'wtd') {
     sales = ss.wtd?.sales || 0; checks = ss.wtd?.checks || 0; label = 'Week to Date';
   } else if (currentFilter === 'mtd') {
