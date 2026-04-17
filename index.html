@@ -505,7 +505,7 @@
     <!-- ══ DASHBOARD ══ -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <div class="page-title">Good morning, Carlie.</div>
+        <div class="page-title" id="dash-greeting">Good morning, Carlie.</div>
         <div class="page-sub" id="dash-date-sub">Loading...</div>
       </div>
 
@@ -551,6 +551,7 @@
           <div class="nav-card" onclick="nav('income')"><div class="nc-icon">📈</div><div class="nc-label">P&amp;L</div><div class="nc-section">Financial</div></div>
           <div class="nav-card" onclick="nav('payroll')"><div class="nc-icon">💳</div><div class="nc-label">Payroll</div><div class="nc-section">Admin</div></div>
           <div class="nav-card" onclick="window.open('https://calendar.google.com','_blank')"><div class="nc-icon">🗓</div><div class="nc-label">Calendar</div><div class="nc-section">External</div></div>
+          <div class="nav-card" onclick="window.open('https://effervescent-bienenstitch-c0ba8a.netlify.app/top10-weekly.html','_blank')"><div class="nc-icon">🏆</div><div class="nc-label">Top 10 Weekly</div><div class="nc-section">Reports</div></div>
           <div class="nav-card" onclick="nav('investors')"><div class="nc-icon">🏦</div><div class="nc-label">Investors</div><div class="nc-section">Admin</div></div>
         </div>
       </div>
@@ -747,6 +748,9 @@ function initApp() {
   const now = new Date();
   document.getElementById('hdr-date').textContent =
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+  var h = now.getHours();
+  var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
   document.getElementById('dash-date-sub').textContent =
     'Today is ' + now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
@@ -769,6 +773,11 @@ async function loadDashboard() {
 function renderDashboard(d) {
   const ss = d.salesSummary || {};
   const meta = d.meta || {};
+
+  if (meta.generatedAt) {
+    var sub = document.getElementById('dash-date-sub');
+    sub.textContent = sub.textContent + ' · Data as of ' + meta.generatedAt;
+  }
 
   // Pick the right period
   let sales, checks, label;
@@ -818,7 +827,8 @@ function renderDashboard(d) {
   `;
 
   // Recent days table
-  const last14 = (d.last14Days || []).slice(0, 7);
+  const todayStr2 = new Date().toISOString().slice(0,10);
+  const last14 = (d.last14Days || []).filter(r => r.date <= todayStr2 && r.checks > 5).slice(0, 7);
   document.getElementById('dash-recent-body').innerHTML = `
     <table class="data-table">
       <thead><tr>
