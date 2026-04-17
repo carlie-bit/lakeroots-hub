@@ -596,8 +596,12 @@
     </div>
 
     <div class="page" id="page-reviews">
-      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub">Google Reviews monitoring</div></div>
-      <div class="placeholder"><div class="placeholder-icon">⭐</div><div class="placeholder-badge">Already Built</div><h3>Reviews Dashboard</h3><p>This tool is already live — link to be wired in.</p></div>
+      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub">Google Reviews — live from RPT_Reviews sheet</div></div>
+      <div class="stats-grid" id="reviews-stats"></div>
+      <div class="section-card" style="margin-top:0;">
+        <div class="section-card-title">⭐ Recent Reviews</div>
+        <div id="reviews-body"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+      </div>
     </div>
 
     <div class="page" id="page-profitability">
@@ -724,6 +728,7 @@ function nav(pageId) {
   closeSidebar();
   // Lazy load page data
   if (pageId === 'accountability') loadAccountability();
+  if (pageId === 'reviews') loadReviews();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -931,6 +936,18 @@ function dayName(ds) {
   if (!ds) return '';
   const d = new Date(ds + 'T12:00:00');
   return d.toLocaleDateString('en-US', { weekday:'short' });
+}
+
+async function loadReviews() {
+  try {
+    const res  = await fetch(PROXY + '?action=snapshot');
+    const snap = await res.json();
+    document.getElementById('reviews-body').innerHTML =
+      '<div class="placeholder" style="padding:32px"><div class="placeholder-icon">⭐</div>' +
+      '<p>Reviews data loads from RPT_Reviews sheet. Add <b>?action=reviews</b> to the proxy to wire this live.</p>' +
+      '<a href="https://docs.google.com/spreadsheets/d/1I6eCGQ8SLwVHrC2UiUkfWoAcQ3SJK-_XCmXEFpCW1MU" target="_blank" style="color:var(--sage);font-weight:600;">Open RPT_Reviews Sheet →</a>' +
+      '</div>';
+  } catch(e) {}
 }
 </script>
 </body>
