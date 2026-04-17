@@ -552,6 +552,7 @@
           <div class="nav-card" onclick="nav('payroll')"><div class="nc-icon">💳</div><div class="nc-label">Payroll</div><div class="nc-section">Admin</div></div>
           <div class="nav-card" onclick="window.open('https://calendar.google.com','_blank')"><div class="nc-icon">🗓</div><div class="nc-label">Calendar</div><div class="nc-section">External</div></div>
           <div class="nav-card" onclick="window.open('https://effervescent-bienenstitch-c0ba8a.netlify.app/top10-weekly.html','_blank')"><div class="nc-icon">🏆</div><div class="nc-label">Top 10 Weekly</div><div class="nc-section">Reports</div></div>
+          <div class="nav-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')"><div class="nc-icon">🍽</div><div class="nc-label">Recipe Builds</div><div class="nc-section">ME</div></div>
           <div class="nav-card" onclick="nav('investors')"><div class="nc-icon">🏦</div><div class="nc-label">Investors</div><div class="nc-section">Admin</div></div>
         </div>
       </div>
@@ -748,11 +749,10 @@ function initApp() {
   const now = new Date();
   document.getElementById('hdr-date').textContent =
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
-  var h = now.getHours();
-  var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const hr = new Date().getHours();
+  const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
   document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
-  document.getElementById('dash-date-sub').textContent =
-    'Today is ' + now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  document.getElementById('dash-date-sub').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
 }
 
@@ -773,11 +773,6 @@ async function loadDashboard() {
 function renderDashboard(d) {
   const ss = d.salesSummary || {};
   const meta = d.meta || {};
-
-  if (meta.generatedAt) {
-    var sub = document.getElementById('dash-date-sub');
-    sub.textContent = sub.textContent + ' · Data as of ' + meta.generatedAt;
-  }
 
   // Pick the right period
   let sales, checks, label;
@@ -809,10 +804,10 @@ function renderDashboard(d) {
       <div class="stat-value">${fmtMoney(sales)}</div>
       <div class="stat-meta">${checks} checks · $${avgCheck} avg</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Est. COGS (30%)</div>
+    <div class="stat-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer">
+      <div class="stat-label">Est. COGS (30% — recipes incomplete)</div>
       <div class="stat-value small">${fmtMoney(cogs)}</div>
-      <div class="stat-meta">Based on 30% estimate — see ME for actuals</div>
+      <div class="stat-meta">Complete ME recipes for actuals →</div>
     </div>
     <div class="stat-card sage">
       <div class="stat-label">Est. Gross Profit</div>
@@ -825,6 +820,11 @@ function renderDashboard(d) {
       <div class="stat-meta">${ss.bestDay ? fmtDate(ss.bestDay.date) + ' · ' + ss.bestDay.checks + ' checks' : ''}</div>
     </div>
   `;
+
+  if (d.meta?.generatedAt) {
+    const sub = document.getElementById('dash-date-sub');
+    if (sub && !sub.textContent.includes('Data as of')) sub.textContent += ' · Data as of ' + d.meta.generatedAt;
+  }
 
   // Recent days table
   const todayStr2 = new Date().toISOString().slice(0,10);
