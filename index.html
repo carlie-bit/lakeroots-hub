@@ -804,6 +804,11 @@ function renderDashboard(d) {
       <div class="stat-value">${fmtMoney(sales)}</div>
       <div class="stat-meta">${checks} checks · $${avgCheck} avg</div>
     </div>
+    <div class="stat-card" id="card-today" style="cursor:pointer;" onclick="loadTodayCard()">
+      <div class="stat-label">Today So Far ↻</div>
+      <div class="stat-value small" id="today-sales" style="font-size:20px;color:rgba(54,58,46,0.3);">tap to load</div>
+      <div class="stat-meta" id="today-meta">Live from Toast · tap to refresh</div>
+    </div>
     <div class="stat-card">
       <div class="stat-label">Est. COGS (30%)</div>
       <div class="stat-value small">${fmtMoney(cogs)}</div>
@@ -867,6 +872,8 @@ function renderDashboard(d) {
         </tr>`).join('')}
       </tbody>
     </table>`;
+
+  loadTodayCard();
 }
 
 // ── ACCOUNTABILITY DATA ──────────────────────────────────────
@@ -932,6 +939,32 @@ function dayName(ds) {
   if (!ds) return '';
   const d = new Date(ds + 'T12:00:00');
   return d.toLocaleDateString('en-US', { weekday:'short' });
+}
+
+async function loadTodayCard() {
+  const el     = document.getElementById('today-sales');
+  const elMeta = document.getElementById('today-meta');
+  if (!el) return;
+  el.textContent = '...';
+  el.style.color = '';
+  el.style.fontSize = '';
+  try {
+    const res  = await fetch(PROXY + '?action=today');
+    const data = await res.json();
+    const sales = data.totalSales || 0;
+    const items = data.itemCount  || 0;
+    const now   = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour:'numeric', minute:'2-digit', hour12:true, timeZone:'America/Chicago'
+    });
+    el.textContent    = '$' + sales.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+    el.style.color    = 'var(--green)';
+    el.style.fontSize = '28px';
+    el.style.fontWeight = '600';
+    if (elMeta) elMeta.textContent = items + ' items · as of ' + timeStr + ' CT · tap to refresh';
+  } catch(e) {
+    if (el) { el.textContent = 'unavailable'; el.style.color = 'rgba(54,58,46,0.3)'; }
+  }
 }
 </script>
 </body>
