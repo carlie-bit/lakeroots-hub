@@ -274,6 +274,7 @@
   .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .data-table th {
     text-align: left; padding: 10px 14px;
+    white-space: nowrap;
     font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
     color: rgba(54,58,46,0.45); border-bottom: 1px solid rgba(54,58,46,0.1);
     font-weight: 600;
@@ -286,6 +287,10 @@
   .data-table tr:hover td { background: rgba(54,58,46,0.025); }
   .data-table tr:last-child td { border-bottom: none; }
   .td-right { text-align: right; font-family: 'HighwayGothicNarrow', sans-serif; font-size: 14px; }
+  .data-table th:nth-child(3),
+  .data-table th:nth-child(4),
+  .data-table th:nth-child(5) { text-align: right; }
+  .data-table th:last-child { text-align: right; }
   .td-bold { font-weight: 600; }
 
   /* LOADING */
@@ -838,10 +843,11 @@ function renderDashboard(d) {
   document.getElementById('dash-recent-body').innerHTML = `
     <table class="data-table">
       <thead><tr>
-        <th>Date</th><th>Day</th>
-        <th class="td-right">Sales</th>
-        <th class="td-right">Checks</th>
-        <th class="td-right">Avg</th>
+        <th style="width:90px">Date</th>
+        <th style="width:70px">Day</th>
+        <th style="width:120px;text-align:right">Sales</th>
+        <th style="width:100px;text-align:right">Checks</th>
+        <th style="width:110px;text-align:right">Avg</th>
       </tr></thead>
       <tbody>
         ${last14.map(r => `<tr>
@@ -859,9 +865,10 @@ function renderDashboard(d) {
   document.getElementById('dash-top-body').innerHTML = `
     <table class="data-table">
       <thead><tr>
-        <th>#</th><th>Item</th>
-        <th class="td-right">Units</th>
-        <th class="td-right">Revenue</th>
+        <th style="width:30px">#</th>
+        <th>Item</th>
+        <th style="width:80px;text-align:right">Units</th>
+        <th style="width:100px;text-align:right">Revenue</th>
       </tr></thead>
       <tbody>
         ${top.map((i, idx) => `<tr>
