@@ -1009,7 +1009,7 @@ async function loadTopItemsForPeriod() {
     const res  = await fetch(PROXY + '?action=' + action);
     const data = await res.json();
     renderTopItems(data.items || [], 'qty', 'rev');
-    if (titleEl) titleEl.textContent = title + ' · ' + (data.startDate || '') + ' – ' + (data.endDate || '');
+    if (titleEl && data.startDate) titleEl.textContent = title + ' · ' + data.startDate + ' – ' + data.endDate;
   } catch(e) {
     bodyEl.innerHTML = '<div class="loading">⚠️ Could not load</div>';
   }
@@ -1028,7 +1028,7 @@ function renderTopItems(items, qtyKey, revKey) {
           '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.round(((i[qtyKey]||0)/maxQty)*100) + '%;"></div>' +
         '</div>' +
       '</div>' +
-      '<div style="font-size:12px;font-family:HighwayGothicNarrow,sans-serif;color:var(--green);flex-shrink:0;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);">units</span></div>' +
+      '<div style="font-size:12px;color:var(--green);flex-shrink:0;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);">units</span></div>' +
     '</div>').join('') +
   '</div>';
 }
