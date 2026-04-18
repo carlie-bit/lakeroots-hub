@@ -596,11 +596,14 @@
     </div>
 
     <div class="page" id="page-reviews">
-      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub">Google Reviews — live from RPT_Reviews sheet</div></div>
-      <div class="stats-grid" id="reviews-stats"></div>
-      <div class="section-card" style="margin-top:0;">
-        <div class="section-card-title">⭐ Recent Reviews</div>
-        <div id="reviews-body"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub" id="reviews-sub">Google Reviews — loading...</div></div>
+      <div class="stats-grid" id="reviews-stats"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Loading...</div></div>
+      <div class="section-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="section-card-title" style="margin-bottom:0;">Recent Reviews</div>
+          <a href="https://business.google.com" target="_blank" style="background:var(--green);color:var(--cream);text-decoration:none;padding:8px 16px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Respond on Google →</a>
+        </div>
+        <div id="reviews-body"><div class="loading"><div class="spinner"></div></div></div>
       </div>
     </div>
 
@@ -940,14 +943,68 @@ function dayName(ds) {
 
 async function loadReviews() {
   try {
-    const res  = await fetch(PROXY + '?action=snapshot');
-    const snap = await res.json();
-    document.getElementById('reviews-body').innerHTML =
-      '<div class="placeholder" style="padding:32px"><div class="placeholder-icon">⭐</div>' +
-      '<p>Reviews data loads from RPT_Reviews sheet. Add <b>?action=reviews</b> to the proxy to wire this live.</p>' +
-      '<a href="https://docs.google.com/spreadsheets/d/1I6eCGQ8SLwVHrC2UiUkfWoAcQ3SJK-_XCmXEFpCW1MU" target="_blank" style="color:var(--sage);font-weight:600;">Open RPT_Reviews Sheet →</a>' +
-      '</div>';
-  } catch(e) {}
+    const res  = await fetch(PROXY + '?action=reviews');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Stats
+    document.getElementById('reviews-sub').textContent =
+      data.googleRating + '★ overall · ' + data.totalReviews + ' total Google reviews · ' + data.fiveStars + ' five-star in tracker';
+    document.getElementById('reviews-stats').innerHTML = `
+      <div class="stat-card green">
+        <div class="stat-label">Google Rating</div>
+        <div class="stat-value">${data.googleRating || data.avgRating}★</div>
+        <div class="stat-meta">${data.totalReviews} total reviews on Google</div>
+      </div>
+      <div class="stat-card sage">
+        <div class="stat-label">Tracked Reviews</div>
+        <div class="stat-value small">${data.count}</div>
+        <div class="stat-meta">${data.fiveStars} five-star · ${data.lowStars} need response</div>
+      </div>
+      <div class="stat-card ${data.lowStars > 0 ? 'red' : 'green'}">
+        <div class="stat-label">Needs Response</div>
+        <div class="stat-value small">${data.lowStars}</div>
+        <div class="stat-meta">${data.lowStars > 0 ? '⚠️ 3 stars or below' : '✅ All good'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Tracked Rating</div>
+        <div class="stat-value small">${data.avgRating}★</div>
+        <div class="stat-meta">Based on ${data.count} tracked reviews</div>
+      </div>
+    `;
+
+    // Reviews list
+    const reviews = data.reviews || [];
+    document.getElementById('reviews-body').innerHTML = reviews.map(r => {
+      const stars   = parseInt(r['Rating']) || 0;
+      const isLow   = stars <= 3;
+      const responded = r['Responded'] === 'Yes';
+      const starStr = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+      const text    = r['Review Text'] || '';
+      const date    = r['Date'] ? new Date(r['Date']).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      return `<div style="padding:16px 0;border-bottom:1px solid rgba(54,58,46,0.08);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <span style="font-weight:700;font-size:13px;color:var(--green);">${r['Author']}</span>
+              <span style="color:${isLow ? '#C0392B' : '#B68036'};font-size:13px;">${starStr}</span>
+              <span style="font-size:11px;color:rgba(54,58,46,0.4);">${date}</span>
+            </div>
+            ${text ? `<div style="font-size:13px;color:rgba(54,58,46,0.7);line-height:1.6;margin-top:4px;">${text}</div>` : '<div style="font-size:12px;color:rgba(54,58,46,0.3);font-style:italic;">No text</div>'}
+          </div>
+          <div style="flex-shrink:0;">
+            ${responded
+              ? '<span class="pill pill-sage">Responded</span>'
+              : isLow
+                ? '<span class="pill pill-red">Needs Response</span>'
+                : '<span class="pill pill-gold">Not Responded</span>'}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('reviews-body').innerHTML = '<div class="loading">⚠️ Could not load reviews — ' + e.message + '</div>';
+  }
 }
 </script>
 </body>
