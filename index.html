@@ -28,6 +28,7 @@
     background: var(--cream);
     color: var(--green);
     min-height: 100vh;
+    font-size: 15px;
   }
 
   /* ── PASSWORD SCREEN ─────────────────────────────────────── */
@@ -138,7 +139,7 @@
     display: flex; align-items: center; gap: 10px;
     padding: 9px 20px; cursor: pointer;
     color: rgba(252,251,228,0.6);
-    font-size: 13px; font-weight: 400;
+    font-size: 14px; font-weight: 400;
     border-left: 2px solid transparent;
     transition: all 0.15s; text-decoration: none;
     background: none; border-top: none; border-right: none; border-bottom: none;
@@ -187,8 +188,8 @@
     display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;
   }
   .filter-btn {
-    padding: 7px 16px; border-radius: 20px; border: 1px solid rgba(54,58,46,0.2);
-    background: white; color: var(--green); font-size: 12px; font-weight: 500;
+    padding: 8px 18px; border-radius: 20px; border: 1px solid rgba(54,58,46,0.2);
+    background: white; color: var(--green); font-size: 13px; font-weight: 500;
     cursor: pointer; transition: all 0.15s; font-family: 'HighwayGothicNarrow', sans-serif;
   }
   .filter-btn:hover { border-color: var(--sage); color: var(--green); }
@@ -215,16 +216,16 @@
   .stat-card.sage::before  { background: var(--sage); }
   .stat-card.brown::before { background: var(--brown); }
   .stat-label {
-    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
     color: rgba(54,58,46,0.45); font-weight: 600; margin-bottom: 8px;
   }
   .stat-value {
-    font-family: 'TAYBenditos', serif; font-size: 36px;
+    font-family: 'HighwayGothicNarrow', sans-serif; font-size: 38px; font-weight: 600;
     color: var(--green); line-height: 1;
   }
-  .stat-value.small { font-size: 26px; }
+  .stat-value.small { font-size: 28px; font-weight: 600; }
   .stat-meta {
-    font-size: 11px; color: rgba(54,58,46,0.4); margin-top: 4px;
+    font-size: 13px; color: rgba(54,58,46,0.4); margin-top: 4px;
   }
   .stat-delta {
     font-size: 11px; font-weight: 600; margin-top: 4px;
@@ -273,17 +274,18 @@
   .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .data-table th {
     text-align: left; padding: 10px 14px;
-    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
     color: rgba(54,58,46,0.45); border-bottom: 1px solid rgba(54,58,46,0.1);
     font-weight: 600;
   }
   .data-table td {
-    padding: 11px 14px; border-bottom: 1px solid rgba(54,58,46,0.05);
+    padding: 12px 14px; border-bottom: 1px solid rgba(54,58,46,0.05);
     color: var(--green);
+    font-size: 14px;
   }
   .data-table tr:hover td { background: rgba(54,58,46,0.025); }
   .data-table tr:last-child td { border-bottom: none; }
-  .td-right { text-align: right; font-family: 'RedondoAve', monospace; font-size: 12px; }
+  .td-right { text-align: right; font-family: 'HighwayGothicNarrow', sans-serif; font-size: 14px; }
   .td-bold { font-weight: 600; }
 
   /* LOADING */
