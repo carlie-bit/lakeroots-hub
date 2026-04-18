@@ -505,7 +505,7 @@
     <!-- ══ DASHBOARD ══ -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <div class="page-title" id="dash-greeting">Good morning, Carlie.</div>
+        <div class="page-title">Good morning, Carlie.</div>
         <div class="page-sub" id="dash-date-sub">Loading...</div>
       </div>
 
@@ -551,8 +551,6 @@
           <div class="nav-card" onclick="nav('income')"><div class="nc-icon">📈</div><div class="nc-label">P&amp;L</div><div class="nc-section">Financial</div></div>
           <div class="nav-card" onclick="nav('payroll')"><div class="nc-icon">💳</div><div class="nc-label">Payroll</div><div class="nc-section">Admin</div></div>
           <div class="nav-card" onclick="window.open('https://calendar.google.com','_blank')"><div class="nc-icon">🗓</div><div class="nc-label">Calendar</div><div class="nc-section">External</div></div>
-          <div class="nav-card" onclick="window.open('https://effervescent-bienenstitch-c0ba8a.netlify.app/top10-weekly.html','_blank')"><div class="nc-icon">🏆</div><div class="nc-label">Top 10 Weekly</div><div class="nc-section">Reports</div></div>
-          <div class="nav-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')"><div class="nc-icon">🍽</div><div class="nc-label">Recipe Builds</div><div class="nc-section">ME</div></div>
           <div class="nav-card" onclick="nav('investors')"><div class="nc-icon">🏦</div><div class="nc-label">Investors</div><div class="nc-section">Admin</div></div>
         </div>
       </div>
@@ -596,15 +594,8 @@
     </div>
 
     <div class="page" id="page-reviews">
-      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub" id="reviews-sub">Google Reviews — loading...</div></div>
-      <div class="stats-grid" id="reviews-stats"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Loading...</div></div>
-      <div class="section-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div class="section-card-title" style="margin-bottom:0;">Recent Reviews</div>
-          <a href="https://business.google.com" target="_blank" style="background:var(--green);color:var(--cream);text-decoration:none;padding:8px 16px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Respond on Google →</a>
-        </div>
-        <div id="reviews-body"><div class="loading"><div class="spinner"></div></div></div>
-      </div>
+      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub">Google Reviews monitoring</div></div>
+      <div class="placeholder"><div class="placeholder-icon">⭐</div><div class="placeholder-badge">Already Built</div><h3>Reviews Dashboard</h3><p>This tool is already live — link to be wired in.</p></div>
     </div>
 
     <div class="page" id="page-profitability">
@@ -731,7 +722,6 @@ function nav(pageId) {
   closeSidebar();
   // Lazy load page data
   if (pageId === 'accountability') loadAccountability();
-  if (pageId === 'reviews') loadReviews();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -757,10 +747,8 @@ function initApp() {
   const now = new Date();
   document.getElementById('hdr-date').textContent =
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
-  const hr = new Date().getHours();
-  const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
-  document.getElementById('dash-date-sub').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  document.getElementById('dash-date-sub').textContent =
+    'Today is ' + now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
 }
 
@@ -785,12 +773,11 @@ function renderDashboard(d) {
   // Pick the right period
   let sales, checks, label;
   if (currentFilter === 'yesterday') {
-    const todayStr = new Date().toISOString().slice(0,10);
-    const realDays = (d.last14Days || []).filter(r => r.date <= todayStr && r.checks > 5);
-    const yest = realDays[0] || {};
+    const last14 = d.last14Days || [];
+    const yest = last14[0] || {};
     sales  = yest.sales  || 0;
     checks = yest.checks || 0;
-    label  = yest.date   ? fmtDate(yest.date) : 'Yesterday';
+    label  = yest.date   ? 'Yesterday · ' + fmtDate(yest.date) : 'Yesterday';
   } else if (currentFilter === 'wtd') {
     sales = ss.wtd?.sales || 0; checks = ss.wtd?.checks || 0; label = 'Week to Date';
   } else if (currentFilter === 'mtd') {
@@ -812,10 +799,10 @@ function renderDashboard(d) {
       <div class="stat-value">${fmtMoney(sales)}</div>
       <div class="stat-meta">${checks} checks · $${avgCheck} avg</div>
     </div>
-    <div class="stat-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer">
-      <div class="stat-label">Est. COGS (30% — recipes incomplete)</div>
+    <div class="stat-card">
+      <div class="stat-label">Est. COGS (30%)</div>
       <div class="stat-value small">${fmtMoney(cogs)}</div>
-      <div class="stat-meta">Complete ME recipes for actuals →</div>
+      <div class="stat-meta">Based on 30% estimate — see ME for actuals</div>
     </div>
     <div class="stat-card sage">
       <div class="stat-label">Est. Gross Profit</div>
@@ -829,14 +816,8 @@ function renderDashboard(d) {
     </div>
   `;
 
-  if (d.meta?.generatedAt) {
-    const sub = document.getElementById('dash-date-sub');
-    if (sub && !sub.textContent.includes('Data as of')) sub.textContent += ' · Data as of ' + d.meta.generatedAt;
-  }
-
   // Recent days table
-  const todayStr2 = new Date().toISOString().slice(0,10);
-  const last14 = (d.last14Days || []).filter(r => r.date <= todayStr2 && r.checks > 5).slice(0, 7);
+  const last14 = (d.last14Days || []).slice(0, 7);
   document.getElementById('dash-recent-body').innerHTML = `
     <table class="data-table">
       <thead><tr>
@@ -939,79 +920,6 @@ function dayName(ds) {
   if (!ds) return '';
   const d = new Date(ds + 'T12:00:00');
   return d.toLocaleDateString('en-US', { weekday:'short' });
-}
-
-async function loadReviews() {
-  try {
-    const res  = await fetch(PROXY + '?action=reviews');
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    // Stats
-    document.getElementById('reviews-sub').textContent =
-      data.googleRating + '★ overall · ' + data.totalReviews + ' total Google reviews · ' + data.fiveStars + ' five-star in tracker';
-    const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/Chicago'}) + ' CT' : 'unknown';
-    document.getElementById('reviews-sub').textContent += ' · Last synced: ' + lastUpdated;
-    document.getElementById('reviews-stats').innerHTML = `
-      <div class="stat-card green">
-        <div class="stat-label">Google Rating</div>
-        <div class="stat-value">${data.googleRating || data.avgRating}★</div>
-        <div class="stat-meta">${data.totalReviews} total reviews on Google</div>
-      </div>
-      <div class="stat-card sage">
-        <div class="stat-label">Tracked Reviews</div>
-        <div class="stat-value small">${data.count}</div>
-        <div class="stat-meta">${data.fiveStars} five-star · ${data.lowStars} need response</div>
-      </div>
-      <div class="stat-card ${data.lowStars > 0 ? 'red' : 'green'}">
-        <div class="stat-label">Needs Response</div>
-        <div class="stat-value small">${data.lowStars}</div>
-        <div class="stat-meta">${data.lowStars > 0 ? '⚠️ 3 stars or below' : '✅ All good'}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg Tracked Rating</div>
-        <div class="stat-value small">${data.avgRating}★</div>
-        <div class="stat-meta">Based on ${data.count} tracked reviews</div>
-      </div>
-      <div class="stat-card" onclick="window.open('https://www.yelp.com/biz/lake-roots-crystal-lake','_blank')" style="cursor:pointer;">
-        <div class="stat-label">Yelp</div>
-        <div class="stat-value small">4.5★</div>
-        <div class="stat-meta">View on Yelp →</div>
-      </div>
-    `;
-
-    // Reviews list
-    const reviews = data.reviews || [];
-    document.getElementById('reviews-body').innerHTML = reviews.map(r => {
-      const stars   = parseInt(r['Rating']) || 0;
-      const isLow   = stars <= 3;
-      const responded = r['Responded'] === 'Yes';
-      const starStr = '★'.repeat(stars) + '☆'.repeat(5 - stars);
-      const text    = r['Review Text'] || '';
-      const date    = r['Date'] ? new Date(r['Date']).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      return `<div style="padding:16px 0;border-bottom:1px solid rgba(54,58,46,0.08);">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-              <span style="font-weight:700;font-size:13px;color:var(--green);">${r['Author']}</span>
-              <span style="color:${isLow ? '#C0392B' : '#B68036'};font-size:13px;">${starStr}</span>
-              <span style="font-size:11px;color:rgba(54,58,46,0.4);">${date}</span>
-            </div>
-            ${text ? `<div style="font-size:13px;color:rgba(54,58,46,0.7);line-height:1.6;margin-top:4px;">${text}</div>` : '<div style="font-size:12px;color:rgba(54,58,46,0.3);font-style:italic;">No text</div>'}
-          </div>
-          <div style="flex-shrink:0;">
-            ${responded
-              ? '<span class="pill pill-sage">Responded</span>'
-              : isLow
-                ? '<span class="pill pill-red">Needs Response</span>'
-                : '<span class="pill pill-gold">Not Responded</span>'}
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    document.getElementById('reviews-body').innerHTML = '<div class="loading">⚠️ Could not load reviews — ' + e.message + '</div>';
-  }
 }
 </script>
 </body>
