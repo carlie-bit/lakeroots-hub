@@ -880,26 +880,7 @@ function renderDashboard(d) {
       </tbody>
     </table>`;
 
-  const retail = (d.retailSummary?.topRetailThisWeek || []).slice(0, 10);
-  const retailEl = document.getElementById('dash-retail-body');
-  if (retailEl) {
-    const maxRetailQty = retail[0]?.qty7 || 1;
-    retailEl.innerHTML = '<div style="padding:4px 0;">' +
-      retail.map((i, idx) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(54,58,46,0.05);">' +
-        '<div style="font-size:11px;color:rgba(54,58,46,0.3);width:16px;text-align:right;flex-shrink:0;">' + (idx+1) + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + i.name + '</div>' +
-          '<div style="height:4px;background:rgba(54,58,46,0.08);border-radius:2px;margin-top:3px;">' +
-            '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.min(60,Math.round(((i.qty7||0)/maxRetailQty)*60)) + '%;"></div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0;">' +
-          '<div style="font-size:12px;color:var(--green);font-weight:600;">' + (i.qty7||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;">units</span></div>' +
-          '<div style="font-size:11px;color:rgba(54,58,46,0.5);">' + fmtMoney(i.rev7||0) + '</div>' +
-        '</div>' +
-      '</div>').join('') + '</div>';
-  }
-
+  loadRetailForPeriod();
   loadTodayCard();
 }
 
@@ -1037,12 +1018,40 @@ function renderTopItems(items, qtyKey, revKey) {
           '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.min(60, Math.round(((i[qtyKey]||0)/maxQty)*60)) + '%;"></div>' +
         '</div>' +
       '</div>' +
-      '<div style="text-align:right;flex-shrink:0;">' +
-        '<div style="font-size:12px;color:var(--green);font-weight:600;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;">units</span></div>' +
-        '<div style="font-size:11px;color:rgba(54,58,46,0.5);">' + fmtMoney(i[revKey]||0) + '</div>' +
-      '</div>' +
+      '<div style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;font-size:11px;">units · </span>' + fmtMoney(i[revKey]||0) + '</div>' +
     '</div>').join('') +
   '</div>';
+}
+
+async function loadRetailForPeriod() {
+  const titleEl = document.getElementById('retail-title');
+  const bodyEl  = document.getElementById('dash-retail-body');
+  if (!bodyEl) return;
+
+  let title;
+  if (currentFilter === 'ytd')      title = '🏪 Top Retail YTD';
+  else if (currentFilter === 'mtd') title = '🏪 Top Retail This Month';
+  else if (currentFilter === 'wtd') title = '🏪 Top Retail This Week';
+  else                              title = '🏪 Top Retail This Week';
+  if (titleEl) titleEl.textContent = title;
+
+  if (!_snapCache) return;
+  const retail = (_snapCache.retailSummary?.topRetailThisWeek || []).slice(0, 10);
+  const maxRetailQty = retail[0]?.qty7 || 1;
+
+  if (bodyEl) {
+    bodyEl.innerHTML = '<div style="padding:4px 0;">' +
+      retail.map((i, idx) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(54,58,46,0.05);">' +
+        '<div style="font-size:11px;color:rgba(54,58,46,0.3);width:16px;text-align:right;flex-shrink:0;">' + (idx+1) + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + i.name + '</div>' +
+          '<div style="height:4px;background:rgba(54,58,46,0.08);border-radius:2px;margin-top:3px;">' +
+            '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.min(60,Math.round(((i.qty7||0)/maxRetailQty)*60)) + '%;"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap;flex-shrink:0;">' + (i.qty7||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;font-size:11px;">units · </span>' + fmtMoney(i.rev7||0) + '</div>' +
+      '</div>').join('') + '</div>';
+  }
 }
 </script>
 </body>
