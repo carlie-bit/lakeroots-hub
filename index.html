@@ -507,7 +507,7 @@
     <!-- ══ DASHBOARD ══ -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <div class="page-title">Good morning, Carlie.</div>
+        <div class="page-title" id="dash-greeting">Good morning, Carlie.</div>
         <div class="page-sub" id="dash-date-sub">Loading...</div>
       </div>
 
@@ -749,8 +749,10 @@ function initApp() {
   const now = new Date();
   document.getElementById('hdr-date').textContent =
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
-  document.getElementById('dash-date-sub').textContent =
-    'Today is ' + now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  const hr = now.getHours();
+  const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
+  document.getElementById('dash-date-sub').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
 }
 
@@ -775,11 +777,12 @@ function renderDashboard(d) {
   // Pick the right period
   let sales, checks, label;
   if (currentFilter === 'yesterday') {
-    const last14 = d.last14Days || [];
-    const yest = last14[0] || {};
+    const todayStr = new Date().toISOString().slice(0,10);
+    const realDays = (d.last14Days || []).filter(r => r.date <= todayStr && r.checks > 5);
+    const yest = realDays[0] || {};
     sales  = yest.sales  || 0;
     checks = yest.checks || 0;
-    label  = yest.date   ? 'Yesterday · ' + fmtDate(yest.date) : 'Yesterday';
+    label  = yest.date   ? fmtDate(yest.date) : 'Yesterday';
   } else if (currentFilter === 'wtd') {
     sales = ss.wtd?.sales || 0; checks = ss.wtd?.checks || 0; label = 'Week to Date';
   } else if (currentFilter === 'mtd') {
@@ -818,8 +821,15 @@ function renderDashboard(d) {
     </div>
   `;
 
+  const sub = document.getElementById('dash-date-sub');
+  if (sub && d.meta?.generatedAt) {
+    const t = sub.textContent.split(' · Pipeline')[0];
+    sub.textContent = t + ' · Pipeline last ran: ' + d.meta.generatedAt;
+  }
+
   // Recent days table
-  const last14 = (d.last14Days || []).slice(0, 7);
+  const todayStr2 = new Date().toISOString().slice(0,10);
+  const last14 = (d.last14Days || []).filter(r => r.date <= todayStr2 && r.checks > 5).slice(0, 7);
   document.getElementById('dash-recent-body').innerHTML = `
     <table class="data-table">
       <thead><tr>
