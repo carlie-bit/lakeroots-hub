@@ -950,6 +950,8 @@ async function loadReviews() {
     // Stats
     document.getElementById('reviews-sub').textContent =
       data.googleRating + '★ overall · ' + data.totalReviews + ' total Google reviews · ' + data.fiveStars + ' five-star in tracker';
+    const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/Chicago'}) + ' CT' : 'unknown';
+    document.getElementById('reviews-sub').textContent += ' · Last synced: ' + lastUpdated;
     document.getElementById('reviews-stats').innerHTML = `
       <div class="stat-card green">
         <div class="stat-label">Google Rating</div>
@@ -970,6 +972,11 @@ async function loadReviews() {
         <div class="stat-label">Avg Tracked Rating</div>
         <div class="stat-value small">${data.avgRating}★</div>
         <div class="stat-meta">Based on ${data.count} tracked reviews</div>
+      </div>
+      <div class="stat-card" onclick="window.open('https://www.yelp.com/biz/lake-roots-crystal-lake','_blank')" style="cursor:pointer;">
+        <div class="stat-label">Yelp</div>
+        <div class="stat-value small">4.5★</div>
+        <div class="stat-meta">View on Yelp →</div>
       </div>
     `;
 
