@@ -538,7 +538,7 @@
           <div id="dash-recent-body"><div class="loading"><div class="spinner"></div></div></div>
         </div>
         <div class="section-card" id="dash-top-card">
-          <div class="section-card-title">🔥 Top Items This Week</div>
+          <div class="section-card-title" id="top-items-title">🔥 Top Items This Week</div>
           <div id="dash-top-body"><div class="loading"><div class="spinner"></div></div></div>
         </div>
       </div>
@@ -767,17 +767,22 @@ function initApp() {
 }
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
+let _snapCache = null;
 async function loadDashboard() {
-  document.getElementById('dash-stats').innerHTML =
-    '<div class="loading"><div class="spinner"></div> Fetching live data...</div>';
-  try {
-    const res  = await fetch(PROXY + '?action=snapshot');
-    const data = await res.json();
-    renderDashboard(data);
-  } catch(e) {
+  if (!_snapCache) {
     document.getElementById('dash-stats').innerHTML =
-      '<div class="loading">⚠️ Could not load data — check connection</div>';
+      '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Fetching live data...</div>';
+    try {
+      const res  = await fetch(PROXY + '?action=snapshot');
+      _snapCache = await res.json();
+    } catch(e) {
+      document.getElementById('dash-stats').innerHTML =
+        '<div class="loading" style="grid-column:1/-1">⚠️ Could not load — check connection</div>';
+      return;
+    }
   }
+  renderDashboard(_snapCache);
+  loadTopItemsForPeriod();
 }
 
 function renderDashboard(d) {
@@ -862,29 +867,6 @@ function renderDashboard(d) {
           <td class="td-right td-bold">${fmtMoney(r.sales)}</td>
           <td class="td-right">${r.checks}</td>
           <td class="td-right">$${r.checks > 0 ? (r.sales/r.checks).toFixed(2) : '—'}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
-
-  // Top items
-  const topSource = (currentFilter === 'ytd' || currentFilter === 'mtd') ? (d.top20AllTime || []) : (d.top20ThisWeek || []);
-  const topQtyKey = (currentFilter === 'ytd' || currentFilter === 'mtd') ? 'qtyAll' : 'qty7';
-  const topRevKey = (currentFilter === 'ytd' || currentFilter === 'mtd') ? 'revAll' : 'rev7';
-  const top = topSource.slice(0, 10);
-  document.getElementById('dash-top-body').innerHTML = `
-    <table class="data-table">
-      <thead><tr>
-        <th style="width:30px">#</th>
-        <th>Item</th>
-        <th style="width:80px;text-align:right">Units</th>
-        <th style="width:100px;text-align:right">Revenue</th>
-      </tr></thead>
-      <tbody>
-        ${top.map((i, idx) => `<tr>
-          <td style="color:rgba(54,58,46,0.35);font-size:11px">${idx+1}</td>
-          <td class="td-bold">${i.name}</td>
-          <td class="td-right">${i[topQtyKey] || i.qty7 || 0}</td>
-          <td class="td-right">${fmtMoney(i[topRevKey] || i.rev7 || 0)}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
@@ -1001,6 +983,54 @@ async function loadTodayCard() {
   } catch(e) {
     if (el) { el.textContent = 'unavailable'; el.style.color = 'rgba(54,58,46,0.3)'; }
   }
+}
+
+async function loadTopItemsForPeriod() {
+  const titleEl = document.getElementById('top-items-title');
+  const bodyEl  = document.getElementById('dash-top-body');
+  if (!bodyEl) return;
+
+  let action, title;
+  if (currentFilter === 'ytd') { action = 'topytd'; title = '🔥 Top 10 YTD'; }
+  else if (currentFilter === 'mtd') { action = 'topmtd'; title = '🔥 Top 10 This Month'; }
+  else if (currentFilter === 'wtd') { action = 'topwtd'; title = '🔥 Top 10 This Week'; }
+  else { action = null; title = '🔥 Top 10 This Week'; }
+
+  if (titleEl) titleEl.textContent = title;
+
+  if (!action) {
+    const top = (_snapCache?.top20ThisWeek || []).slice(0, 10);
+    renderTopItems(top, 'qty7', 'rev7');
+    return;
+  }
+
+  bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const res  = await fetch(PROXY + '?action=' + action);
+    const data = await res.json();
+    renderTopItems(data.items || [], 'qty', 'rev');
+    if (titleEl) titleEl.textContent = title + ' · ' + (data.startDate || '') + ' – ' + (data.endDate || '');
+  } catch(e) {
+    bodyEl.innerHTML = '<div class="loading">⚠️ Could not load</div>';
+  }
+}
+
+function renderTopItems(items, qtyKey, revKey) {
+  const bodyEl = document.getElementById('dash-top-body');
+  if (!bodyEl) return;
+  const maxQty = items[0]?.[qtyKey] || 1;
+  bodyEl.innerHTML = '<div style="padding:4px 0;">' +
+    items.map((i, idx) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(54,58,46,0.05);">' +
+      '<div style="font-size:11px;color:rgba(54,58,46,0.3);width:16px;text-align:right;flex-shrink:0;">' + (idx+1) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + i.name + '</div>' +
+        '<div style="height:4px;background:rgba(54,58,46,0.08);border-radius:2px;margin-top:3px;">' +
+          '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.round(((i[qtyKey]||0)/maxQty)*100) + '%;"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;font-family:HighwayGothicNarrow,sans-serif;color:var(--green);flex-shrink:0;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);">units</span></div>' +
+    '</div>').join('') +
+  '</div>';
 }
 </script>
 </body>
