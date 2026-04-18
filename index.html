@@ -606,8 +606,18 @@
     </div>
 
     <div class="page" id="page-reviews">
-      <div class="page-header"><div class="page-title">Reviews</div><div class="page-sub">Google Reviews monitoring</div></div>
-      <div class="placeholder"><div class="placeholder-icon">⭐</div><div class="placeholder-badge">Already Built</div><h3>Reviews Dashboard</h3><p>This tool is already live — link to be wired in.</p></div>
+      <div class="page-header">
+        <div class="page-title">Reviews</div>
+        <div class="page-sub" id="reviews-sub">Google Reviews — loading...</div>
+      </div>
+      <div class="stats-grid" id="reviews-stats"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Loading...</div></div>
+      <div class="section-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="section-card-title" style="margin-bottom:0;">Recent Reviews</div>
+          <a href="https://business.google.com" target="_blank" style="background:var(--green);color:var(--cream);text-decoration:none;padding:8px 16px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Respond on Google →</a>
+        </div>
+        <div id="reviews-body"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
     </div>
 
     <div class="page" id="page-profitability">
