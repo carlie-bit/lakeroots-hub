@@ -522,7 +522,8 @@
 
       <!-- Date filter -->
       <div class="date-filter-bar">
-        <button class="filter-btn active" onclick="setFilter('yesterday',this)">Yesterday</button>
+        <button class="filter-btn active" onclick="setFilter('today',this)">Today</button>
+        <button class="filter-btn" onclick="setFilter('yesterday',this)">Yesterday</button>
         <button class="filter-btn" onclick="setFilter('wtd',this)">This Week</button>
         <button class="filter-btn" onclick="setFilter('mtd',this)">This Month</button>
         <button class="filter-btn" onclick="setFilter('last-month',this)">Last Month</button>
@@ -762,7 +763,7 @@ function closeSidebar() {
 }
 
 // ── DATE FILTER ─────────────────────────────────────────────
-let currentFilter = 'yesterday';
+let currentFilter = 'today';
 function setFilter(filter, btn) {
   currentFilter = filter;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -807,7 +808,11 @@ function renderDashboard(d) {
 
   // Pick the right period
   let sales, checks, label;
-  if (currentFilter === 'yesterday') {
+  if (currentFilter === 'today') {
+    sales = 0; checks = 0; label = 'Today';
+    // Will be filled by loadTodayCard automatically
+    loadTodayCard();
+  } else if (currentFilter === 'yesterday') {
     const todayStr = new Date().toISOString().slice(0,10);
     const realDays = (d.last14Days || []).filter(r => r.date <= todayStr && r.checks > 5);
     const yest = realDays[0] || {};
