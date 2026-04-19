@@ -749,6 +749,7 @@ function nav(pageId) {
   closeSidebar();
   // Lazy load page data
   if (pageId === 'accountability') loadAccountability();
+  if (pageId === 'reviews') loadReviews();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1056,6 +1057,45 @@ async function loadRetailForPeriod() {
         '</div>' +
         '<div style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap;flex-shrink:0;">' + (i.qty7||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;font-size:11px;">units · </span>' + fmtMoney(i.rev7||0) + '</div>' +
       '</div>').join('') + '</div>';
+  }
+}
+
+async function loadReviews() {
+  const subEl   = document.getElementById('reviews-sub');
+  const statsEl = document.getElementById('reviews-stats');
+  const bodyEl  = document.getElementById('reviews-body');
+  if (!bodyEl) return;
+  try {
+    const res  = await fetch(PROXY + '?action=reviews');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/Chicago'}) + ' CT' : 'unknown';
+    if (subEl) subEl.textContent = data.googleRating + '★ overall · ' + data.totalReviews + ' total Google reviews · Last synced: ' + lastUpdated;
+    if (statsEl) statsEl.innerHTML =
+      '<div class="stat-card green"><div class="stat-label">Google Rating</div><div class="stat-value">' + (data.googleRating||data.avgRating) + '★</div><div class="stat-meta">' + data.totalReviews + ' total reviews</div></div>' +
+      '<div class="stat-card sage"><div class="stat-label">Tracked</div><div class="stat-value small">' + data.count + '</div><div class="stat-meta">' + data.fiveStars + ' five-star · ' + data.lowStars + ' need response</div></div>' +
+      '<div class="stat-card ' + (data.lowStars > 0 ? 'red' : 'green') + '"><div class="stat-label">Needs Response</div><div class="stat-value small">' + data.lowStars + '</div><div class="stat-meta">' + (data.lowStars > 0 ? '⚠️ 3 stars or below' : '✅ All clear') + '</div></div>';
+    const reviews = data.reviews || [];
+    if (bodyEl) bodyEl.innerHTML = reviews.map(r => {
+      const stars = parseInt(r['Rating'])||0;
+      const isLow = stars <= 3;
+      const starStr = '★'.repeat(stars) + '☆'.repeat(5-stars);
+      const text = r['Review Text'] || '';
+      const date = r['Date'] ? new Date(r['Date']).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+      return '<div style="padding:16px 0;border-bottom:1px solid rgba(54,58,46,0.08);">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">' +
+        '<span style="font-weight:700;font-size:13px;color:var(--green);">' + r['Author'] + '</span>' +
+        '<span style="color:' + (isLow?'#C0392B':'#B68036') + ';font-size:13px;">' + starStr + '</span>' +
+        '<span style="font-size:11px;color:rgba(54,58,46,0.4);">' + date + '</span></div>' +
+        (text ? '<div style="font-size:13px;color:rgba(54,58,46,0.7);line-height:1.6;margin-top:4px;">' + text + '</div>' : '<div style="font-size:12px;color:rgba(54,58,46,0.3);font-style:italic;">No text</div>') +
+        '</div>' +
+        '<div style="flex-shrink:0;"><span class="pill ' + (r['Responded']==='Yes'?'pill-sage':isLow?'pill-red':'pill-gold') + '">' + (r['Responded']==='Yes'?'Responded':isLow?'Needs Response':'Not Responded') + '</span></div>' +
+        '</div></div>';
+    }).join('');
+  } catch(e) {
+    if (bodyEl) bodyEl.innerHTML = '<div class="loading">⚠️ Could not load reviews — ' + e.message + '</div>';
   }
 }
 </script>
