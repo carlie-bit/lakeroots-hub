@@ -836,6 +836,11 @@ function renderDashboard(d) {
       <div class="stat-value small" id="today-sales" style="font-size:20px;color:rgba(54,58,46,0.3);">tap to load</div>
       <div class="stat-meta" id="today-meta">Live from Toast · tap to refresh</div>
     </div>
+    <div class="stat-card" id="card-dowavg">
+      <div class="stat-label" id="dowavg-label">Avg for Today's DOW</div>
+      <div class="stat-value small" id="dowavg-value" style="font-size:20px;color:rgba(54,58,46,0.3);">loading...</div>
+      <div class="stat-meta" id="dowavg-meta">Fetching historical average...</div>
+    </div>
     <div class="stat-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer;">
       <div class="stat-label">Est. COGS (30% — tap to fix)</div>
       <div class="stat-value small">${fmtMoney(estCogs)}</div>
@@ -852,6 +857,8 @@ function renderDashboard(d) {
       <div class="stat-meta">${ss.bestDay ? fmtDate(ss.bestDay.date) + (ss.bestDay.checks > 0 ? ' · ' + ss.bestDay.checks + ' checks' : '') : ''}</div>
     </div>
   `;
+
+  loadDowAvg();
 
   const sub = document.getElementById('dash-date-sub');
   if (sub && d.meta?.generatedAt) {
@@ -1092,6 +1099,26 @@ async function loadReviews() {
     }).join('');
   } catch(e) {
     if (bodyEl) bodyEl.innerHTML = '<div class="loading">⚠️ Could not load reviews — ' + e.message + '</div>';
+  }
+}
+
+async function loadDowAvg() {
+  const labelEl = document.getElementById('dowavg-label');
+  const valEl   = document.getElementById('dowavg-value');
+  const metaEl  = document.getElementById('dowavg-meta');
+  if (!valEl) return;
+  try {
+    const res  = await fetch(PROXY + '?action=dowavg');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const dow = data.dayOfWeek || new Date().toLocaleDateString('en-US',{weekday:'long'});
+    if (labelEl) labelEl.textContent = 'Avg ' + dow;
+    valEl.style.color = ''; valEl.style.fontSize = '';
+    valEl.textContent = fmtMoney(data.avgSales || 0);
+    if (metaEl) metaEl.textContent = data.weekCount + ' ' + dow + 's tracked' + (data.avgChecks ? ' · ' + Math.round(data.avgChecks) + ' avg checks' : '');
+  } catch(e) {
+    valEl.textContent = '—';
+    if (metaEl) metaEl.textContent = 'Could not load DOW average';
   }
 }
 </script>
