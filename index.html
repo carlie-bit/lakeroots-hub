@@ -830,11 +830,6 @@ function renderDashboard(d) {
   const grossMargin = sales > 0 ? ((grossProfit / sales) * 100).toFixed(1) : '—';
 
   document.getElementById('dash-stats').innerHTML = `
-    <div class="stat-card green">
-      <div class="stat-label">Gross Sales · ${label}</div>
-      <div class="stat-value">${fmtMoney(sales)}</div>
-      <div class="stat-meta">${checks} checks · $${avgCheck} avg</div>
-    </div>
     <div class="stat-card" id="card-today" style="cursor:pointer;" onclick="loadTodayCard()">
       <div class="stat-label">Today So Far ↻</div>
       <div class="stat-value small" id="today-sales" style="font-size:20px;color:rgba(54,58,46,0.3);">tap to load</div>
