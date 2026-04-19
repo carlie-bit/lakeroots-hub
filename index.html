@@ -700,6 +700,7 @@
 <script>
 const PROXY = 'https://effervescent-bienenstitch-c0ba8a.netlify.app/.netlify/functions/proxy';
 const PIN   = '8888';
+let _snapCache = null;
 
 // ── AUTH ────────────────────────────────────────────────────
 function checkPin() {
@@ -781,7 +782,6 @@ function initApp() {
 }
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
-let _snapCache = null;
 async function loadDashboard() {
   if (!_snapCache) {
     document.getElementById('dash-stats').innerHTML =
