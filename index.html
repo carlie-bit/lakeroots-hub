@@ -601,7 +601,20 @@
 
     <div class="page" id="page-open-items">
       <div class="page-header"><div class="page-title">Open Items</div><div class="page-sub">Unmapped Toast items requiring ME attention</div></div>
-      <div class="placeholder"><div class="placeholder-icon">🔔</div><div class="placeholder-badge">Coming Soon</div><h3>Open Items Tracker</h3><p>Mirror of the daily 6am email. Live view of unresolved items, aging, and who owns each one.</p></div>
+      <div id="oi-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;"></div>
+      <div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid rgba(54,58,46,0.08);display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);">Unresolved Items</div>
+          <div id="oi-filter" style="display:flex;gap:8px;"></div>
+        </div>
+        <div id="oi-table" style="padding:0;"></div>
+      </div>
+      <div style="margin-top:16px;">
+        <div id="oi-resolved-toggle" onclick="toggleResolved()" style="cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);padding:12px 0;">▶ RECENTLY RESOLVED (LAST 7 DAYS)</div>
+        <div id="oi-resolved" style="display:none;background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);overflow:hidden;">
+          <div id="oi-resolved-table"></div>
+        </div>
+      </div>
     </div>
 
     <div class="page" id="page-inventory">
@@ -752,6 +765,7 @@ function nav(pageId) {
   // Lazy load page data
   if (pageId === 'accountability') loadAccountability();
   if (pageId === 'reviews') loadReviews();
+  if (pageId === 'open-items') loadOpenItems();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1129,6 +1143,73 @@ async function loadDowAvg() {
     valEl.textContent = '—';
     if (metaEl) metaEl.textContent = 'Could not load DOW average';
   }
+}
+
+async function loadOpenItems() {
+  const stats = document.getElementById('oi-stats');
+  const table = document.getElementById('oi-table');
+  if (!stats || !table) return;
+  stats.innerHTML = '<div class="stat-card" style="grid-column:span 4;text-align:center;padding:20px;color:rgba(54,58,46,0.4);">Loading...</div>';
+  try {
+    const res = await fetch(PROXY + '?action=openitems');
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    const s = d.summary || {};
+    stats.innerHTML = [
+      ['Total Unresolved', s.totalUnresolved || 0, '', s.totalUnresolved > 0 ? 'red' : 'green'],
+      ['New Today', s.newToday || 0, '', ''],
+      ['Avg Days Open', s.avgDaysOpen || 0, 'days', s.avgDaysOpen > 3 ? 'red' : s.avgDaysOpen > 1 ? 'amber' : ''],
+      ['Oldest Item', s.oldestDays || 0, 'days', s.oldestDays > 7 ? 'red' : s.oldestDays > 3 ? 'amber' : '']
+    ].map(([label, val, unit, color]) =>
+      `<div class="stat-card ${color ? 'stat-' + color : ''}">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value small">${val}${unit ? ' <span style="font-size:14px;font-weight:400;">' + unit + '</span>' : ''}</div>
+      </div>`
+    ).join('');
+    const items = d.unresolved || [];
+    if (items.length === 0) {
+      table.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(54,58,46,0.4);font-size:13px;">✅ No unresolved items</div>';
+    } else {
+      table.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+        '<thead><tr style="background:rgba(54,58,46,0.04);">' +
+        ['Item Name','Price','Register','Server','Date Found','Days Open'].map(h =>
+          `<th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);border-bottom:1px solid rgba(54,58,46,0.08);">${h}</th>`
+        ).join('') + '</tr></thead><tbody>' +
+        items.map((item, i) => {
+          const dayColor = item.daysOpen > 3 ? '#C0392B' : item.daysOpen > 0 ? '#E67E22' : '#2E7D32';
+          return `<tr style="border-bottom:1px solid rgba(54,58,46,0.06);${i%2===1?'background:rgba(54,58,46,0.02);':''}">
+            <td style="padding:12px 16px;font-size:13px;font-weight:600;">${item.itemName}</td>
+            <td style="padding:12px 16px;font-size:13px;">$${item.price.toFixed(2)}</td>
+            <td style="padding:12px 16px;font-size:13px;color:rgba(54,58,46,0.6);">${item.register}</td>
+            <td style="padding:12px 16px;font-size:13px;color:rgba(54,58,46,0.6);">${item.serverName}</td>
+            <td style="padding:12px 16px;font-size:13px;color:rgba(54,58,46,0.6);">${item.dateFound}</td>
+            <td style="padding:12px 16px;"><span style="font-weight:700;color:${dayColor};">${item.daysOpen}d</span></td>
+          </tr>`;
+        }).join('') + '</tbody></table>';
+    }
+    const resolved = d.recentResolved || [];
+    document.getElementById('oi-resolved-toggle').textContent = '▶ RECENTLY RESOLVED (LAST 7 DAYS) — ' + resolved.length + ' items';
+    document.getElementById('oi-resolved-table').innerHTML = resolved.length === 0
+      ? '<div style="padding:20px;text-align:center;color:rgba(54,58,46,0.4);font-size:13px;">None in last 7 days</div>'
+      : '<table style="width:100%;border-collapse:collapse;"><tbody>' +
+        resolved.map(item => `<tr style="border-bottom:1px solid rgba(54,58,46,0.06);">
+          <td style="padding:10px 16px;font-size:13px;font-weight:600;">${item.itemName}</td>
+          <td style="padding:10px 16px;font-size:13px;">$${item.price.toFixed(2)}</td>
+          <td style="padding:10px 16px;font-size:13px;color:rgba(54,58,46,0.6);">${item.serverName}</td>
+          <td style="padding:10px 16px;font-size:13px;color:#2E7D32;">✓ Resolved ${item.resolvedDate}</td>
+        </tr>`).join('') + '</tbody></table>';
+  } catch(e) {
+    stats.innerHTML = '';
+    table.innerHTML = '<div style="padding:20px;color:rgba(54,58,46,0.4);">⚠️ Could not load — ' + e.message + '</div>';
+  }
+}
+
+function toggleResolved() {
+  const el = document.getElementById('oi-resolved');
+  const toggle = document.getElementById('oi-resolved-toggle');
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  toggle.textContent = toggle.textContent.replace(open ? '▼' : '▶', open ? '▶' : '▼');
 }
 </script>
 </body>
