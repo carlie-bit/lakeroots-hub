@@ -837,6 +837,8 @@ function renderDashboard(d) {
     sales = ss.wtd?.sales || 0; checks = ss.wtd?.checks || 0; label = 'Week to Date';
   } else if (currentFilter === 'mtd') {
     sales = ss.mtd?.sales || 0; checks = ss.mtd?.checks || 0; label = 'Month to Date';
+  } else if (currentFilter === 'last-month') {
+    sales = ss.lastMonth?.sales || 0; checks = ss.lastMonth?.checks || 0; label = 'Last Month';
   } else if (currentFilter === 'ytd') {
     sales = ss.ytd?.sales || 0; checks = ss.ytd?.checks || 0; label = 'Year to Date';
   } else {
@@ -860,15 +862,15 @@ function renderDashboard(d) {
       <div class="stat-value small" id="dowavg-value" style="font-size:20px;color:rgba(54,58,46,0.3);">loading...</div>
       <div class="stat-meta" id="dowavg-meta">Fetching historical average...</div>
     </div>
-    <div class="stat-card" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer;">
+    <div class="stat-card" id="card-cogs" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer;">
       <div class="stat-label">Est. COGS (30% — tap to fix)</div>
-      <div class="stat-value small">${fmtMoney(estCogs)}</div>
+      <div class="stat-value small" id="cogs-value">${fmtMoney(estCogs)}</div>
       <div class="stat-meta">Complete ME recipes for actuals →</div>
     </div>
-    <div class="stat-card sage">
+    <div class="stat-card sage" id="card-gross">
       <div class="stat-label">Est. Gross Profit</div>
-      <div class="stat-value small">${fmtMoney(grossProfit)}</div>
-      <div class="stat-meta">${grossMargin}% margin</div>
+      <div class="stat-value small" id="gross-value">${fmtMoney(grossProfit)}</div>
+      <div class="stat-meta" id="gross-meta">${grossMargin}% margin</div>
     </div>
     <div class="stat-card brown">
       <div class="stat-label">Best Day (Ever)</div>
@@ -998,9 +1000,23 @@ async function loadTodayCard() {
     el.style.fontSize = '28px';
     el.style.fontWeight = '600';
     if (elMeta) elMeta.textContent = items + ' items · as of ' + timeStr + ' CT · tap to refresh';
+    // Update COGS/Gross Profit if today filter is active
+    if (currentFilter === 'today') updateCogsCards(sales);
   } catch(e) {
     if (el) { el.textContent = 'unavailable'; el.style.color = 'rgba(54,58,46,0.3)'; }
   }
+}
+
+function updateCogsCards(sales) {
+  const cogs = sales * 0.30;
+  const gross = sales - cogs;
+  const margin = sales > 0 ? ((gross / sales) * 100).toFixed(1) : '—';
+  const cogsEl = document.getElementById('cogs-value');
+  const grossEl = document.getElementById('gross-value');
+  const grossMeta = document.getElementById('gross-meta');
+  if (cogsEl) cogsEl.textContent = fmtMoney(cogs);
+  if (grossEl) grossEl.textContent = fmtMoney(gross);
+  if (grossMeta) grossMeta.textContent = margin + '% margin';
 }
 
 async function loadTopItemsForPeriod() {
@@ -1010,8 +1026,11 @@ async function loadTopItemsForPeriod() {
 
   let action, title;
   if (currentFilter === 'ytd') { action = 'topytd'; title = '🔥 Top 10 YTD'; }
+  else if (currentFilter === 'last-month') { action = 'topmtd'; title = '🔥 Top 10 Last Month'; }
   else if (currentFilter === 'mtd') { action = 'topmtd'; title = '🔥 Top 10 This Month'; }
   else if (currentFilter === 'wtd') { action = 'topwtd'; title = '🔥 Top 10 This Week'; }
+  else if (currentFilter === 'yesterday') { action = null; title = '🔥 Top 10 This Week'; }
+  else if (currentFilter === 'today') { action = null; title = '🔥 Top 10 This Week'; }
   else { action = null; title = '🔥 Top 10 This Week'; }
 
   if (titleEl) titleEl.textContent = title;
@@ -1057,29 +1076,48 @@ async function loadRetailForPeriod() {
   if (!bodyEl) return;
 
   let title;
-  if (currentFilter === 'ytd')      title = '🏪 Top Retail YTD';
-  else if (currentFilter === 'mtd') title = '🏪 Top Retail This Month';
-  else if (currentFilter === 'wtd') title = '🏪 Top Retail This Week';
-  else                              title = '🏪 Top Retail This Week';
+  if (currentFilter === 'ytd')           title = '🏪 Top Retail YTD';
+  else if (currentFilter === 'last-month') title = '🏪 Top Retail Last Month';
+  else if (currentFilter === 'mtd')      title = '🏪 Top Retail This Month';
+  else if (currentFilter === 'wtd')      title = '🏪 Top Retail This Week';
+  else                                   title = '🏪 Top Retail This Week';
   if (titleEl) titleEl.textContent = title;
 
-  if (!_snapCache) return;
-  const retail = (_snapCache.retailSummary?.topRetailThisWeek || []).slice(0, 10);
-  const maxRetailQty = retail[0]?.qty7 || 1;
+  let action = null;
+  if (currentFilter === 'ytd') action = 'retailytd';
+  else if (currentFilter === 'last-month' || currentFilter === 'mtd') action = 'retailmtd';
+  else if (currentFilter === 'wtd') action = 'retailwtd';
 
-  if (bodyEl) {
-    bodyEl.innerHTML = '<div style="padding:4px 0;">' +
-      retail.map((i, idx) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(54,58,46,0.05);">' +
-        '<div style="font-size:11px;color:rgba(54,58,46,0.3);width:16px;text-align:right;flex-shrink:0;">' + (idx+1) + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + i.name + '</div>' +
-          '<div style="height:4px;background:rgba(54,58,46,0.08);border-radius:2px;margin-top:3px;">' +
-            '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.min(60,Math.round(((i.qty7||0)/maxRetailQty)*60)) + '%;"></div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap;flex-shrink:0;">' + (i.qty7||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;font-size:11px;">units · </span>' + fmtMoney(i.rev7||0) + '</div>' +
-      '</div>').join('') + '</div>';
+  if (action) {
+    bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    try {
+      const res = await fetch(PROXY + '?action=' + action);
+      const data = await res.json();
+      const items = data.items || [];
+      renderRetailItems(items, 'qty', 'rev', bodyEl);
+    } catch(e) {
+      bodyEl.innerHTML = '<div class="loading">⚠️ Could not load</div>';
+    }
+  } else {
+    if (!_snapCache) return;
+    const retail = (_snapCache.retailSummary?.topRetailThisWeek || []).slice(0, 10);
+    renderRetailItems(retail, 'qty7', 'rev7', bodyEl);
   }
+}
+
+function renderRetailItems(items, qtyKey, revKey, bodyEl) {
+  const maxQty = items[0]?.[qtyKey] || 1;
+  bodyEl.innerHTML = '<div style="padding:4px 0;">' +
+    items.map((i, idx) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(54,58,46,0.05);">' +
+      '<div style="font-size:11px;color:rgba(54,58,46,0.3);width:16px;text-align:right;flex-shrink:0;">' + (idx+1) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + i.name + '</div>' +
+        '<div style="height:4px;background:rgba(54,58,46,0.08);border-radius:2px;margin-top:3px;">' +
+          '<div style="height:4px;background:var(--sage);border-radius:2px;width:' + Math.min(60,Math.round(((i[qtyKey]||0)/maxQty)*60)) + '%;"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap;flex-shrink:0;">' + (i[qtyKey]||0) + ' <span style="color:rgba(54,58,46,0.4);font-weight:400;font-size:11px;">units · </span>' + fmtMoney(i[revKey]||0) + '</div>' +
+    '</div>').join('') + '</div>';
 }
 
 async function loadReviews() {
@@ -1131,11 +1169,19 @@ async function loadDowAvg() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const dowNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const todayName = dowNames[new Date().getDay()];
-    const dayData = data.dowAverages && data.dowAverages[todayName];
+    // Determine which day-of-week to show based on selected filter
+    let targetDay;
+    if (currentFilter === 'yesterday') {
+      const yDate = new Date();
+      yDate.setDate(yDate.getDate() - 1);
+      targetDay = dowNames[yDate.getDay()];
+    } else {
+      targetDay = dowNames[new Date().getDay()];
+    }
+    const dayData = data.dowAverages && data.dowAverages[targetDay];
     const avg = dayData ? dayData.avg : 0;
     const count = dayData ? dayData.count : 0;
-    if (labelEl) labelEl.textContent = 'Avg ' + todayName;
+    if (labelEl) labelEl.textContent = 'Avg ' + targetDay;
     valEl.style.color = ''; valEl.style.fontSize = '';
     valEl.textContent = fmtMoney(avg);
     if (metaEl) metaEl.textContent = count + ' weeks tracked';
