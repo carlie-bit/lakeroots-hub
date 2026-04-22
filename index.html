@@ -834,6 +834,8 @@ function initApp() {
   document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
   document.getElementById('dash-date-sub').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
+  // Load ME cost data
+  fetch('/me_cost_lookup.json').then(r => r.json()).then(d => { window.ME_COSTS = d; }).catch(() => { window.ME_COSTS = null; });
 }
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
@@ -1419,6 +1421,19 @@ function buildChart(daily) {
   return '<div style="overflow-x:auto;padding:8px 0;"><svg width="' + Math.max(totalW, 100) + '" height="' + chartH + '" style="display:block;">' + bars + labels + '</svg></div>';
 }
 
+function lookupMECost(itemName) {
+  if (!window.ME_COSTS || !itemName) return null;
+  const key = itemName.toLowerCase();
+  // Exact match
+  if (window.ME_COSTS[key]) return window.ME_COSTS[key];
+  // Partial: find first key that contains or is contained by the item name
+  const keys = Object.keys(window.ME_COSTS);
+  for (let i = 0; i < keys.length; i++) {
+    if (key.includes(keys[i]) || keys[i].includes(key)) return window.ME_COSTS[keys[i]];
+  }
+  return null;
+}
+
 function renderItemDetail() {
   const d = _itemSelected;
   const detail = document.getElementById('item-detail');
@@ -1456,6 +1471,7 @@ function renderItemDetail() {
       '<div style="font-size:12px;color:rgba(54,58,46,0.6);">Last sold ' + daysSince + ' days ago — ' + (isRed ? 'consider discontinuing or promoting' : 'monitor for continued decline') + '</div></div></div>';
   }
 
+  const me = lookupMECost(name);
   const p = _itemPeriod;
   const periodLabel = p === 'wtd' ? 'Week to Date' : p === 'mtd' ? 'Month to Date' : p === 'ytd' ? 'Year to Date' : p === 'custom' ? 'Custom Range' : 'All Time';
 
@@ -1525,11 +1541,18 @@ function renderItemDetail() {
         '</div>' +
       '</div>' +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
-      '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Margin</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Cost Status</div><div class="stat-value small" style="font-size:14px;color:rgba(54,58,46,0.3);">Pending</div><div class="stat-meta">Cost data pending ME recipe builds</div></div>' +
-    '</div>';
+    (me
+      ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
+          '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small">$' + parseFloat(me.cost).toFixed(2) + '</div><div class="stat-meta">' + (me.type || '') + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Cost %</div><div class="stat-value small" style="color:' + (parseFloat(me.costPct) > 35 ? '#C0392B' : parseFloat(me.costPct) > 28 ? '#E67E22' : '#2E7D32') + ';">' + me.costPct + '%</div><div class="stat-meta">of $' + parseFloat(me.menuPrice).toFixed(2) + ' menu price</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value small" style="color:#2E7D32;">$' + parseFloat(me.netProfit).toFixed(2) + '</div><div class="stat-meta" style="color:#2E7D32;">Live — ME export 4/22/26</div></div>' +
+        '</div>'
+      : '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
+          '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Cost %</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">Cost data pending ME recipe builds</div></div>' +
+        '</div>'
+    );
 }
 
 function updateOnHand() {
