@@ -1361,6 +1361,14 @@ function filterDaily(daily, period) {
   const now = new Date();
   const today = now.toISOString().slice(0,10);
   if (period === 'all') return daily;
+  if (period === 'custom') {
+    const s = document.getElementById('item-date-start');
+    const e = document.getElementById('item-date-end');
+    const start = s ? s.value : '';
+    const end = e ? e.value : today;
+    if (!start) return daily;
+    return daily.filter(d => d.date >= start && d.date <= end);
+  }
   let cutoff;
   if (period === 'wtd') {
     const d = new Date(now); d.setDate(d.getDate() - d.getDay());
@@ -1373,25 +1381,40 @@ function filterDaily(daily, period) {
   return daily.filter(d => d.date >= cutoff);
 }
 
+function getDow(dateStr) {
+  const days = ['Su','M','T','W','Th','F','Sa'];
+  return days[new Date(dateStr + 'T12:00:00').getDay()];
+}
+
 function buildChart(daily) {
   if (!daily || daily.length === 0) return '<div style="padding:20px;text-align:center;color:rgba(54,58,46,0.3);font-size:13px;">No daily data for this period</div>';
   const maxQty = Math.max(...daily.map(d => d.qty || 0), 1);
-  const barW = Math.max(4, Math.min(20, Math.floor(600 / daily.length) - 2));
-  const chartH = 120;
+  const barW = Math.max(12, Math.min(32, Math.floor(600 / daily.length) - 4));
+  const topPad = 16; // space for qty labels above bars
+  const chartH = 150;
+  const barArea = chartH - 36 - topPad; // room for labels below + qty above
   const bars = daily.map((d, i) => {
-    const h = Math.max(1, Math.round(((d.qty || 0) / maxQty) * (chartH - 20)));
-    const x = i * (barW + 2);
-    return '<rect x="' + x + '" y="' + (chartH - 20 - h) + '" width="' + barW + '" height="' + h + '" rx="2" fill="var(--sage)" opacity="0.8"><title>' + d.date + ': ' + (d.qty||0) + ' units</title></rect>';
+    const qty = d.qty || 0;
+    const h = Math.max(1, Math.round((qty / maxQty) * barArea));
+    const x = i * (barW + 4);
+    const barY = topPad + barArea - h;
+    const labelY = barY - 3;
+    return '<rect x="' + x + '" y="' + barY + '" width="' + barW + '" height="' + h + '" rx="2" fill="var(--sage)" opacity="0.8"><title>' + d.date + ': ' + qty + ' units</title></rect>' +
+      (qty > 0 ? '<text x="' + (x + barW/2) + '" y="' + labelY + '" text-anchor="middle" fill="var(--green)" font-size="9" font-weight="600" font-family="inherit">' + qty + '</text>' : '');
   }).join('');
-  const totalW = daily.length * (barW + 2);
-  // X-axis labels — show ~5 evenly spaced
-  const labelCount = Math.min(5, daily.length);
-  const step = Math.max(1, Math.floor(daily.length / labelCount));
-  const labels = daily.filter((_, i) => i % step === 0 || i === daily.length - 1).map((d, idx) => {
-    const i = daily.indexOf(d);
-    const x = i * (barW + 2) + barW / 2;
+  const totalW = daily.length * (barW + 4);
+  // X-axis: date + day of week for every bar
+  const labelStep = daily.length > 20 ? Math.ceil(daily.length / 15) : 1;
+  const labels = daily.map((d, i) => {
+    if (i % labelStep !== 0 && i !== daily.length - 1) return '';
+    const x = i * (barW + 4) + barW / 2;
     const parts = d.date.split('-');
-    return '<text x="' + x + '" y="' + (chartH - 4) + '" text-anchor="middle" fill="rgba(54,58,46,0.4)" font-size="9" font-family="inherit">' + parseInt(parts[1]) + '/' + parseInt(parts[2]) + '</text>';
+    const dateLabel = parseInt(parts[1]) + '/' + parseInt(parts[2]);
+    const dow = getDow(d.date);
+    const dateY = topPad + barArea + 12;
+    const dowY = dateY + 10;
+    return '<text x="' + x + '" y="' + dateY + '" text-anchor="middle" fill="rgba(54,58,46,0.4)" font-size="9" font-family="inherit">' + dateLabel + '</text>' +
+      '<text x="' + x + '" y="' + dowY + '" text-anchor="middle" fill="rgba(54,58,46,0.3)" font-size="8" font-family="inherit">' + dow + '</text>';
   }).join('');
   return '<div style="overflow-x:auto;padding:8px 0;"><svg width="' + Math.max(totalW, 100) + '" height="' + chartH + '" style="display:block;">' + bars + labels + '</svg></div>';
 }
@@ -1407,7 +1430,7 @@ function renderItemDetail() {
   const filtered = filterDaily(daily, _itemPeriod);
 
   const totalQty = filtered.reduce((s, r) => s + (r.qty || 0), 0) || d.totalQty || 0;
-  const totalRev = filtered.reduce((s, r) => s + (r.rev || 0), 0) || d.totalRev || 0;
+  const totalRev = filtered.reduce((s, r) => s + (r.sales || r.rev || 0), 0) || d.totalSales || d.totalRev || 0;
   const avgPrice = totalQty > 0 ? totalRev / totalQty : 0;
 
   const lastSale = d.lastSaleDate || d.lastDate || (daily.length ? daily[daily.length - 1].date : null);
@@ -1434,7 +1457,7 @@ function renderItemDetail() {
   }
 
   const p = _itemPeriod;
-  const periodLabel = p === 'wtd' ? 'Week to Date' : p === 'mtd' ? 'Month to Date' : p === 'ytd' ? 'Year to Date' : 'All Time';
+  const periodLabel = p === 'wtd' ? 'Week to Date' : p === 'mtd' ? 'Month to Date' : p === 'ytd' ? 'Year to Date' : p === 'custom' ? 'Custom Range' : 'All Time';
 
   detail.innerHTML =
     '<div style="margin-bottom:16px;">' +
@@ -1453,20 +1476,54 @@ function renderItemDetail() {
     '<div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);padding:16px 20px;margin-bottom:20px;">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
         '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);">Daily Sales</div>' +
-        '<div style="display:flex;gap:6px;">' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
           '<button class="filter-btn item-period-btn ' + (p==='wtd'?'active':'') + '" onclick="setItemPeriod(\'wtd\',this)" style="padding:4px 12px;font-size:11px;">WTD</button>' +
           '<button class="filter-btn item-period-btn ' + (p==='mtd'?'active':'') + '" onclick="setItemPeriod(\'mtd\',this)" style="padding:4px 12px;font-size:11px;">MTD</button>' +
           '<button class="filter-btn item-period-btn ' + (p==='ytd'?'active':'') + '" onclick="setItemPeriod(\'ytd\',this)" style="padding:4px 12px;font-size:11px;">YTD</button>' +
           '<button class="filter-btn item-period-btn ' + (p==='all'?'active':'') + '" onclick="setItemPeriod(\'all\',this)" style="padding:4px 12px;font-size:11px;">All Time</button>' +
+          '<button class="filter-btn item-period-btn ' + (p==='custom'?'active':'') + '" onclick="setItemPeriod(\'custom\',this)" style="padding:4px 12px;font-size:11px;">Custom</button>' +
         '</div>' +
       '</div>' +
+      (p === 'custom' ? '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">' +
+        '<input type="date" id="item-date-start" style="padding:4px 8px;border:1px solid rgba(54,58,46,0.2);border-radius:6px;font-size:12px;font-family:inherit;" onchange="renderItemDetail()">' +
+        '<span style="color:rgba(54,58,46,0.4);font-size:12px;">to</span>' +
+        '<input type="date" id="item-date-end" value="' + new Date().toISOString().slice(0,10) + '" style="padding:4px 8px;border:1px solid rgba(54,58,46,0.2);border-radius:6px;font-size:12px;font-family:inherit;" onchange="renderItemDetail()">' +
+      '</div>' : '') +
       buildChart(filtered) +
+    '</div>' +
+    '<div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);padding:16px 20px;margin-bottom:20px;">' +
+      '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:12px;">Inventory Estimate</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">' +
+        '<div class="field" style="margin:0;">' +
+          '<label style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;display:block;">Starting Inventory</label>' +
+          '<input type="number" id="startingInventory" placeholder="0" min="0" style="width:100%;padding:8px 12px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:16px;font-weight:600;font-family:inherit;text-align:center;" oninput="updateOnHand()">' +
+        '</div>' +
+        '<div class="stat-card"><div class="stat-label">Units Sold</div><div class="stat-value small" id="inv-units-sold">' + totalQty.toLocaleString() + '</div><div class="stat-meta">' + periodLabel + '</div></div>' +
+        '<div class="stat-card"><div class="stat-label">Theoretical On Hand</div><div class="stat-value small" id="inv-on-hand">—</div><div class="stat-meta">Starting − Sold</div></div>' +
+        '<div class="stat-card"><div class="stat-label">Waste / Shrink</div><div class="stat-value small" style="font-size:14px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">Coming soon — ME integration</div></div>' +
+      '</div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
       '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
       '<div class="stat-card"><div class="stat-label">Margin</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
       '<div class="stat-card"><div class="stat-label">Cost Status</div><div class="stat-value small" style="font-size:14px;color:rgba(54,58,46,0.3);">Pending</div><div class="stat-meta">Cost data pending ME recipe builds</div></div>' +
     '</div>';
+}
+
+function updateOnHand() {
+  const start = parseInt(document.getElementById('startingInventory').value) || 0;
+  const soldEl = document.getElementById('inv-units-sold');
+  const onHandEl = document.getElementById('inv-on-hand');
+  if (!soldEl || !onHandEl) return;
+  const sold = parseInt(soldEl.textContent.replace(/,/g, '')) || 0;
+  if (start > 0) {
+    const onHand = start - sold;
+    onHandEl.textContent = onHand.toLocaleString();
+    onHandEl.style.color = onHand < 0 ? '#C0392B' : onHand < 5 ? '#E67E22' : '';
+  } else {
+    onHandEl.textContent = '—';
+    onHandEl.style.color = '';
+  }
 }
 </script>
 </body>
