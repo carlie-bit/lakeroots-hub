@@ -224,7 +224,7 @@ function render() {
           var n = document.createElement("div");
           n.className = "evt-note";
           n.style.color = cat.text;
-          n.textContent = evt.note;
+          n.innerHTML = evt.note;
           el.appendChild(n);
         }
         cell.appendChild(el);
@@ -241,6 +241,18 @@ function render() {
     : "LR Events: Snapshot · Other layers: D47 · D155 · Park District · Downtown CL · The Dole";
 }
 
+function formatDescription(desc) {
+  if (!desc) return '';
+  var urlRegex = /(https?:\/\/[^\s]+)/g;
+  var firstSentence = desc.split(/[.\n]/)[0].trim();
+  var urls = desc.match(urlRegex);
+  var html = firstSentence ? '<div style="font-size:11px;margin-top:2px;">' + firstSentence + '</div>' : '';
+  if (urls && urls[0]) {
+    html += '<a href="' + urls[0] + '" target="_blank" style="font-size:10px;color:var(--sage);text-decoration:none;font-weight:600;">View →</a>';
+  }
+  return html;
+}
+
 // Fetch live data
 fetch(PROXY + "?action=gcal")
   .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
@@ -249,10 +261,11 @@ fetch(PROXY + "?action=gcal")
     lrEvents = items.map(function(item){
       var date = item.start.date || (item.start.dateTime ? item.start.dateTime.split("T")[0] : null);
       var time = parseTime(item);
-      var desc = item.description ? item.description.replace(/<[^>]*>/g,"").trim() : "";
-      if (desc.length > 120) desc = desc.substring(0,120) + "…";
-      var note = [time, desc].filter(Boolean).join(" · ") || null;
-      return { date:date, cat:"lr", title:item.summary||"Untitled", note:note };
+      var rawDesc = item.description ? item.description.replace(/<[^>]*>/g,"").trim() : "";
+      var descHtml = formatDescription(rawDesc);
+      var timeHtml = time ? '<div style="font-size:11px;margin-top:2px;">' + time + '</div>' : '';
+      var noteHtml = (timeHtml || descHtml) ? timeHtml + descHtml : null;
+      return { date:date, cat:"lr", title:item.summary||"Untitled", note:noteHtml };
     }).filter(function(e){ return e.date; });
     status = lrEvents.length > 0 ? "live" : "snapshot";
     render();
