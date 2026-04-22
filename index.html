@@ -461,7 +461,7 @@
       <span class="icon">🛒</span> Ordering Optimizer
     </button>
     <button class="nav-item" onclick="nav('vendors')">
-      <span class="icon">🤝</span> Vendor Database
+      <span class="icon">📋</span> Vendor Database
     </button>
 
     <div class="nav-section">Forms Hub</div>
@@ -685,8 +685,24 @@
     </div>
 
     <div class="page" id="page-vendors">
-      <div class="page-header"><div class="page-title">Vendor Database</div></div>
-      <div class="placeholder"><div class="placeholder-icon">🤝</div><div class="placeholder-badge">Coming Soon</div><h3>Vendor Database</h3><p>All vendors, contacts, ordering schedules, and notes in one place.</p></div>
+      <div class="page-header">
+        <div class="page-title">Vendor Database</div>
+        <div class="page-sub">All active vendors · sourcing, contacts, and ordering</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="vendor-search" placeholder="Search vendors..." oninput="renderVendorTable()" style="flex:1;min-width:200px;padding:9px 14px;border-radius:8px;border:1.5px solid rgba(54,58,46,0.2);font-size:13px;font-family:inherit;background:white;">
+        <select id="vendor-type-filter" onchange="renderVendorTable()" style="padding:9px 14px;border-radius:8px;border:1.5px solid rgba(54,58,46,0.2);font-size:13px;font-family:inherit;background:white;color:var(--green);">
+          <option value="">All Types</option>
+          <option value="COGS">COGS</option>
+          <option value="Market">Market</option>
+          <option value="Bar">Bar</option>
+          <option value="Operations">Operations</option>
+        </select>
+        <div id="vendor-count" style="font-size:12px;font-weight:600;color:rgba(54,58,46,0.4);white-space:nowrap;"></div>
+      </div>
+      <div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);overflow:hidden;">
+        <div id="vendor-table-body"></div>
+      </div>
     </div>
 
     <!-- FORMS HUB PAGES -->
@@ -804,6 +820,7 @@ function nav(pageId) {
   if (pageId === 'reviews') loadReviews();
   if (pageId === 'open-items') loadOpenItems();
   if (pageId === 'itemlookup') document.getElementById('item-search-input').focus();
+  if (pageId === 'vendors') renderVendorTable();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1606,6 +1623,112 @@ function updateOnHand() {
     onHandEl.style.color = onHand < 0 ? '#C0392B' : onHand < 5 ? '#E67E22' : '';
     if (metaEl) metaEl.textContent = 'Theoretical';
   }
+}
+
+// ── VENDOR DATABASE ─────────────────────────────────────────
+const _vendorData = [
+  {num:"101",name:"The Chefs' Warehouse Midwest LLC",nickname:"Chefs' Warehouse",type:"COGS",sub:"Food",orderDay:"Mon/Thu",payment:"ACH",rep:"Araceli",phone:"773-805-6281",email:"",deadline:"Day before by 5pm",leadTime:"1 day",moq:"$200 min",delivery:"Next day",orderProcess:"Online portal",terms:"Net 14",remitEmail:"",freeShipping:"$300+",barcodes:"No",expiration:"",address:"3839 W 47th Pl, Chicago IL 60632",notes:"Good specialty/protein selection. Ask Araceli for weekly specials list."},
+  {num:"102",name:"Sysco Chicago, Inc.",nickname:"Sysco",type:"COGS",sub:"Food",orderDay:"Mon/Fri",payment:"ACH",rep:"Neil",phone:"224-645-5939",email:"",deadline:"Day before by 6pm",leadTime:"1 day",moq:"$250 min",delivery:"Next day",orderProcess:"Sysco Online / app",terms:"Net 10",remitEmail:"",freeShipping:"$350+",barcodes:"Yes",expiration:"",address:"250 Wieboldt Dr, Des Plaines IL 60016",notes:"Primary broadline. Neil is responsive — text for urgent orders."},
+  {num:"305",name:"Southern Glazier's Wine and Spirits",nickname:"Southern Wine & Spirits",type:"COGS",sub:"Bar",orderDay:"Tue",payment:"Check COD",rep:"Matt/Bob/Joe/Janet",phone:"800-776-0180",email:"",deadline:"Monday by noon",leadTime:"1 day",moq:"None",delivery:"Tuesday",orderProcess:"Call or email rep",terms:"COD",remitEmail:"",freeShipping:"No minimum",barcodes:"No",expiration:"N/A",address:"",notes:"Multiple reps — rotate contacts. COD only, bring checks."}
+];
+let _vendorExpanded = null;
+
+function renderVendorTable() {
+  const search = (document.getElementById('vendor-search').value || '').toLowerCase();
+  const typeFilter = document.getElementById('vendor-type-filter').value;
+  const body = document.getElementById('vendor-table-body');
+  const countEl = document.getElementById('vendor-count');
+
+  let vendors = _vendorData;
+  if (typeFilter) vendors = vendors.filter(v => v.type === typeFilter || v.sub === typeFilter);
+  if (search) vendors = vendors.filter(v =>
+    v.name.toLowerCase().includes(search) ||
+    v.nickname.toLowerCase().includes(search) ||
+    v.type.toLowerCase().includes(search) ||
+    v.sub.toLowerCase().includes(search) ||
+    v.rep.toLowerCase().includes(search)
+  );
+
+  if (countEl) countEl.textContent = vendors.length + ' vendor' + (vendors.length !== 1 ? 's' : '');
+
+  if (vendors.length === 0) {
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(54,58,46,0.4);font-size:13px;">No vendors match your search</div>';
+    return;
+  }
+
+  const headerStyle = 'padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);border-bottom:1px solid rgba(54,58,46,0.08);';
+  const cellStyle = 'padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(54,58,46,0.06);';
+
+  let html = '<table style="width:100%;border-collapse:collapse;">' +
+    '<thead><tr style="background:rgba(54,58,46,0.04);">' +
+    '<th style="' + headerStyle + 'width:60px;">#</th>' +
+    '<th style="' + headerStyle + '">Vendor</th>' +
+    '<th style="' + headerStyle + '">Nickname</th>' +
+    '<th style="' + headerStyle + '">Type</th>' +
+    '<th style="' + headerStyle + '">Order Day</th>' +
+    '<th style="' + headerStyle + '">Payment</th>' +
+    '<th style="' + headerStyle + '">Sales Rep</th>' +
+    '<th style="' + headerStyle + '">Phone</th>' +
+    '<th style="' + headerStyle + 'width:70px;"></th>' +
+    '</tr></thead><tbody>';
+
+  vendors.forEach(function(v, i) {
+    const isExpanded = _vendorExpanded === v.num;
+    const rowBg = i % 2 === 1 ? 'background:rgba(54,58,46,0.02);' : '';
+    html += '<tr style="' + rowBg + (isExpanded ? 'background:rgba(153,186,180,0.1);' : '') + '">' +
+      '<td style="' + cellStyle + 'color:rgba(54,58,46,0.4);font-weight:600;">' + v.num + '</td>' +
+      '<td style="' + cellStyle + 'font-weight:700;color:var(--green);">' + v.name + '</td>' +
+      '<td style="' + cellStyle + 'color:rgba(54,58,46,0.6);">' + v.nickname + '</td>' +
+      '<td style="' + cellStyle + '"><span style="background:' + (v.type==='COGS'?'rgba(54,58,46,0.08)':'rgba(153,186,180,0.2)') + ';padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">' + v.type + '</span> <span style="color:rgba(54,58,46,0.4);font-size:11px;">' + v.sub + '</span></td>' +
+      '<td style="' + cellStyle + '">' + v.orderDay + '</td>' +
+      '<td style="' + cellStyle + 'font-size:12px;">' + v.payment + '</td>' +
+      '<td style="' + cellStyle + 'font-weight:600;">' + v.rep + '</td>' +
+      '<td style="' + cellStyle + '"><a href="tel:' + v.phone + '" style="color:var(--sage);text-decoration:none;font-weight:600;font-size:12px;">' + v.phone + '</a></td>' +
+      '<td style="' + cellStyle + 'text-align:center;"><button onclick="_vendorExpanded=(_vendorExpanded===\'' + v.num + '\'?null:\'' + v.num + '\');renderVendorTable();" style="padding:4px 12px;border-radius:6px;border:1px solid var(--sage);background:' + (isExpanded ? 'var(--green)' : 'white') + ';color:' + (isExpanded ? 'var(--cream)' : 'var(--green)') + ';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">' + (isExpanded ? 'Close' : 'View →') + '</button></td>' +
+    '</tr>';
+
+    if (isExpanded) {
+      html += '<tr><td colspan="9" style="padding:0;border-bottom:2px solid var(--sage);">' +
+        '<div style="padding:20px 24px;background:rgba(153,186,180,0.06);">' +
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">' +
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);margin-bottom:8px;">Contact</div>' +
+              vendorField('Sales Rep', v.rep) +
+              vendorField('Phone', v.phone ? '<a href="tel:' + v.phone + '" style="color:var(--sage);text-decoration:none;">' + v.phone + '</a>' : '—') +
+              vendorField('Email', v.email || '—') +
+            '</div>' +
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);margin-bottom:8px;">Ordering</div>' +
+              vendorField('Order Day', v.orderDay) +
+              vendorField('Deadline', v.deadline || '—') +
+              vendorField('Lead Time', v.leadTime || '—') +
+              vendorField('MOQ', v.moq || '—') +
+              vendorField('Delivery', v.delivery || '—') +
+              vendorField('Order Process', v.orderProcess || '—') +
+            '</div>' +
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.4);margin-bottom:8px;">Payment & Logistics</div>' +
+              vendorField('Method', v.payment) +
+              vendorField('Terms', v.terms || '—') +
+              vendorField('Remit Email', v.remitEmail || '—') +
+              vendorField('Free Shipping', v.freeShipping || '—') +
+              vendorField('Vendor Barcodes', v.barcodes || '—') +
+              vendorField('Expiration Notes', v.expiration || '—') +
+            '</div>' +
+          '</div>' +
+          (v.address ? '<div style="margin-top:12px;">' + vendorField('Address', v.address) + '</div>' : '') +
+          (v.notes ? '<div style="margin-top:12px;padding:10px 14px;background:rgba(54,58,46,0.04);border-radius:8px;font-size:12px;color:rgba(54,58,46,0.7);line-height:1.5;"><strong style="color:var(--green);">Notes:</strong> ' + v.notes + '</div>' : '') +
+        '</div>' +
+      '</td></tr>';
+    }
+  });
+
+  html += '</tbody></table>';
+  body.innerHTML = html;
+}
+
+function vendorField(label, value) {
+  return '<div style="display:flex;gap:8px;margin-bottom:5px;font-size:12px;"><span style="color:rgba(54,58,46,0.4);min-width:90px;flex-shrink:0;">' + label + '</span><span style="color:var(--green);font-weight:500;">' + value + '</span></div>';
 }
 </script>
 </body>
