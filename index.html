@@ -1492,15 +1492,37 @@ function renderItemDetail() {
       buildChart(filtered) +
     '</div>' +
     '<div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);padding:16px 20px;margin-bottom:20px;">' +
-      '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:12px;">Inventory Estimate</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">' +
-        '<div class="field" style="margin:0;">' +
-          '<label style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;display:block;">Starting Inventory</label>' +
-          '<input type="number" id="startingInventory" placeholder="0" min="0" style="width:100%;padding:8px 12px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:16px;font-weight:600;font-family:inherit;text-align:center;" oninput="updateOnHand()">' +
+      '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Inventory Estimate</div>' +
+      '<div style="font-size:11px;color:rgba(54,58,46,0.35);margin-bottom:14px;font-family:monospace;">Starting &minus; Sold &minus; Waste + Purchases = On Hand</div>' +
+      '<div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:100px;">' +
+          '<div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Starting Inv.</div>' +
+          '<input type="number" id="startingInventory" placeholder="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:var(--green);box-sizing:border-box;" oninput="updateOnHand()">' +
         '</div>' +
-        '<div class="stat-card"><div class="stat-label">Units Sold</div><div class="stat-value small" id="inv-units-sold">' + totalQty.toLocaleString() + '</div><div class="stat-meta">' + periodLabel + '</div></div>' +
-        '<div class="stat-card"><div class="stat-label">Theoretical On Hand</div><div class="stat-value small" id="inv-on-hand">—</div><div class="stat-meta">Starting − Sold</div></div>' +
-        '<div class="stat-card"><div class="stat-label">Waste / Shrink</div><div class="stat-value small" style="font-size:14px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">Coming soon — ME integration</div></div>' +
+        '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">−</div>' +
+        '<div class="stat-card" style="flex:1;min-width:100px;margin:0;">' +
+          '<div class="stat-label">Units Sold</div>' +
+          '<div class="stat-value small" id="inv-units-sold">' + totalQty.toLocaleString() + '</div>' +
+          '<div class="stat-meta">' + periodLabel + '</div>' +
+        '</div>' +
+        '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">−</div>' +
+        '<div style="flex:1;min-width:100px;">' +
+          '<div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Waste / Shrink</div>' +
+          '<input type="number" id="inv-waste" placeholder="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:#E67E22;box-sizing:border-box;" oninput="updateOnHand()">' +
+          '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;">Manual — ME waste tracking coming</div>' +
+        '</div>' +
+        '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">+</div>' +
+        '<div style="flex:1;min-width:100px;">' +
+          '<div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Purchases</div>' +
+          '<input type="number" id="inv-purchases" placeholder="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:#2E7D32;box-sizing:border-box;" oninput="updateOnHand()">' +
+          '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;"><a href="https://app.marginedge.com" target="_blank" style="color:var(--sage);text-decoration:none;font-weight:600;">See ME orders →</a></div>' +
+        '</div>' +
+        '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">=</div>' +
+        '<div class="stat-card" style="flex:1;min-width:100px;margin:0;border:2px solid var(--sage);">' +
+          '<div class="stat-label">On Hand</div>' +
+          '<div class="stat-value small" id="inv-on-hand">—</div>' +
+          '<div class="stat-meta">Theoretical</div>' +
+        '</div>' +
       '</div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
@@ -1512,12 +1534,14 @@ function renderItemDetail() {
 
 function updateOnHand() {
   const start = parseInt(document.getElementById('startingInventory').value) || 0;
+  const waste = parseInt(document.getElementById('inv-waste').value) || 0;
+  const purchases = parseInt(document.getElementById('inv-purchases').value) || 0;
   const soldEl = document.getElementById('inv-units-sold');
   const onHandEl = document.getElementById('inv-on-hand');
   if (!soldEl || !onHandEl) return;
   const sold = parseInt(soldEl.textContent.replace(/,/g, '')) || 0;
   if (start > 0) {
-    const onHand = start - sold;
+    const onHand = start - sold - waste + purchases;
     onHandEl.textContent = onHand.toLocaleString();
     onHandEl.style.color = onHand < 0 ? '#C0392B' : onHand < 5 ? '#E67E22' : '';
   } else {
