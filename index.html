@@ -1392,9 +1392,9 @@ function buildChart(daily) {
   if (!daily || daily.length === 0) return '<div style="padding:20px;text-align:center;color:rgba(54,58,46,0.3);font-size:13px;">No daily data for this period</div>';
   const maxQty = Math.max(...daily.map(d => d.qty || 0), 1);
   const barW = Math.max(12, Math.min(32, Math.floor(600 / daily.length) - 4));
-  const topPad = 16; // space for qty labels above bars
-  const chartH = 150;
-  const barArea = chartH - 36 - topPad; // room for labels below + qty above
+  const topPad = 20; // space for qty labels above bars
+  const chartH = 240;
+  const barArea = Math.round((chartH - 40 - topPad) * 0.8); // 80% fill for tallest bar
   const bars = daily.map((d, i) => {
     const qty = d.qty || 0;
     const h = Math.max(1, Math.round((qty / maxQty) * barArea));
@@ -1553,23 +1553,29 @@ function renderItemDetail() {
           '<div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">Cost data pending ME recipe builds</div></div>' +
         '</div>'
     );
+  updateOnHand();
 }
 
 function updateOnHand() {
-  const start = parseInt(document.getElementById('startingInventory').value) || 0;
+  const startEl = document.getElementById('startingInventory');
   const waste = parseInt(document.getElementById('inv-waste').value) || 0;
   const purchases = parseInt(document.getElementById('inv-purchases').value) || 0;
   const soldEl = document.getElementById('inv-units-sold');
   const onHandEl = document.getElementById('inv-on-hand');
+  const metaEl = onHandEl ? onHandEl.parentElement.querySelector('.stat-meta') : null;
   if (!soldEl || !onHandEl) return;
   const sold = parseInt(soldEl.textContent.replace(/,/g, '')) || 0;
-  if (start > 0) {
-    const onHand = start - sold - waste + purchases;
-    onHandEl.textContent = onHand.toLocaleString();
-    onHandEl.style.color = onHand < 0 ? '#C0392B' : onHand < 5 ? '#E67E22' : '';
+  const startVal = startEl ? startEl.value : '';
+  const start = parseInt(startVal) || 0;
+  const hasStart = startVal !== '' && start > 0;
+  const onHand = start - sold - waste + purchases;
+  onHandEl.textContent = onHand.toLocaleString();
+  if (!hasStart) {
+    onHandEl.style.color = '#C0392B';
+    if (metaEl) metaEl.textContent = 'Enter starting inventory to complete estimate';
   } else {
-    onHandEl.textContent = '—';
-    onHandEl.style.color = '';
+    onHandEl.style.color = onHand < 0 ? '#C0392B' : onHand < 5 ? '#E67E22' : '';
+    if (metaEl) metaEl.textContent = 'Theoretical';
   }
 }
 </script>
