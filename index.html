@@ -716,17 +716,18 @@
     <div class="page" id="page-itemlookup">
       <div class="page-header">
         <div class="page-title">Item Performance Lookup</div>
-        <div class="page-sub">Search any menu or retail item to see sales performance</div>
+        <div class="page-sub">Search any menu item or retail product by name</div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:20px;">
-        <input type="text" id="item-search-input" placeholder="Search item name..." style="flex:1;padding:10px 16px;border-radius:8px;border:1.5px solid rgba(54,58,46,0.2);font-size:14px;font-family:inherit;background:white;" onkeydown="if(event.key==='Enter')searchItem()">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="item-search-input" placeholder="Search any menu item or retail product..." style="flex:1;padding:10px 16px;border-radius:8px;border:1.5px solid rgba(54,58,46,0.2);font-size:14px;font-family:inherit;background:white;" onkeydown="if(event.key==='Enter')searchItem()">
         <button onclick="searchItem()" style="padding:10px 20px;border-radius:8px;border:none;background:var(--green);color:var(--cream);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;">Search</button>
       </div>
-      <div id="item-results">
+      <div id="item-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+      <div id="item-detail">
         <div style="text-align:center;padding:60px 20px;color:rgba(54,58,46,0.4);">
           <div style="font-size:48px;margin-bottom:12px;">🔍</div>
-          <div style="font-size:14px;font-weight:600;">Search for an item</div>
-          <div style="font-size:13px;margin-top:4px;">Enter a menu or retail item name above to see sales data</div>
+          <div style="font-size:14px;font-weight:600;">Search any menu item or retail product</div>
+          <div style="font-size:13px;margin-top:4px;">Type a name above and press Enter or click Search</div>
         </div>
       </div>
     </div>
@@ -1296,104 +1297,176 @@ function toggleResolved() {
 }
 
 // ── ITEM LOOKUP ─────────────────────────────────────────────
-let _itemData = null;
+let _itemSearchData = null;
+let _itemSelected = null;
 let _itemPeriod = 'wtd';
 
 async function searchItem() {
   const query = document.getElementById('item-search-input').value.trim();
-  const results = document.getElementById('item-results');
+  const pills = document.getElementById('item-pills');
+  const detail = document.getElementById('item-detail');
   if (!query) return;
-  results.innerHTML = '<div class="loading"><div class="spinner"></div> Searching...</div>';
+  pills.innerHTML = '';
+  detail.innerHTML = '<div class="loading"><div class="spinner"></div> Searching...</div>';
   try {
     const res = await fetch(PROXY + '?action=item&item=' + encodeURIComponent(query));
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    _itemData = data;
-    _itemPeriod = 'wtd';
-    renderItemResults();
+    _itemSearchData = data;
+    const names = data.matchedNames || (data.results || []).map(r => r.name) || [];
+    if (names.length === 0 && !data.name) {
+      detail.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(54,58,46,0.5);"><div style="font-size:36px;margin-bottom:8px;">🔍</div><div style="font-size:14px;font-weight:600;">No items found for "' + query + '"</div></div>';
+      return;
+    }
+    if (names.length > 0) {
+      pills.innerHTML = names.map(n =>
+        '<button onclick="selectItem(\'' + n.replace(/'/g, "\\'") + '\')" style="padding:6px 14px;border-radius:16px;border:1.5px solid var(--sage);background:white;color:var(--green);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;" onmouseover="this.style.background=\'var(--sage)\';this.style.color=\'white\'" onmouseout="if(!this.classList.contains(\'pill-active\')){this.style.background=\'white\';this.style.color=\'var(--green)\'}">' + n + '</button>'
+      ).join('');
+      selectItem(names[0]);
+    } else if (data.name) {
+      _itemSelected = data;
+      _itemPeriod = 'wtd';
+      renderItemDetail();
+    }
   } catch(e) {
-    results.innerHTML = '<div style="text-align:center;padding:40px 20px;color:rgba(54,58,46,0.5);">' +
-      '<div style="font-size:36px;margin-bottom:8px;">⚠️</div>' +
-      '<div style="font-size:14px;font-weight:600;">Could not load item data</div>' +
-      '<div style="font-size:13px;margin-top:4px;">' + e.message + '</div></div>';
+    detail.innerHTML = '<div style="text-align:center;padding:40px 20px;color:rgba(54,58,46,0.5);"><div style="font-size:36px;margin-bottom:8px;">⚠️</div><div style="font-size:14px;font-weight:600;">Could not load item data</div><div style="font-size:13px;margin-top:4px;">' + e.message + '</div></div>';
   }
+}
+
+function selectItem(name) {
+  const results = (_itemSearchData && _itemSearchData.results) || [];
+  const item = results.find(r => r.name === name) || _itemSearchData;
+  _itemSelected = item;
+  _itemPeriod = 'wtd';
+  // Highlight active pill
+  document.querySelectorAll('#item-pills button').forEach(b => {
+    const active = b.textContent === name;
+    b.classList.toggle('pill-active', active);
+    b.style.background = active ? 'var(--green)' : 'white';
+    b.style.color = active ? 'var(--cream)' : 'var(--green)';
+    b.style.borderColor = active ? 'var(--green)' : '';
+  });
+  renderItemDetail();
 }
 
 function setItemPeriod(period, btn) {
   _itemPeriod = period;
   document.querySelectorAll('.item-period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  renderItemResults();
+  renderItemDetail();
 }
 
-function renderItemResults() {
-  const d = _itemData;
-  const results = document.getElementById('item-results');
+function filterDaily(daily, period) {
+  if (!daily || !daily.length) return [];
+  const now = new Date();
+  const today = now.toISOString().slice(0,10);
+  if (period === 'all') return daily;
+  let cutoff;
+  if (period === 'wtd') {
+    const d = new Date(now); d.setDate(d.getDate() - d.getDay());
+    cutoff = d.toISOString().slice(0,10);
+  } else if (period === 'mtd') {
+    cutoff = today.slice(0,8) + '01';
+  } else if (period === 'ytd') {
+    cutoff = today.slice(0,5) + '01-01';
+  }
+  return daily.filter(d => d.date >= cutoff);
+}
+
+function buildChart(daily) {
+  if (!daily || daily.length === 0) return '<div style="padding:20px;text-align:center;color:rgba(54,58,46,0.3);font-size:13px;">No daily data for this period</div>';
+  const maxQty = Math.max(...daily.map(d => d.qty || 0), 1);
+  const barW = Math.max(4, Math.min(20, Math.floor(600 / daily.length) - 2));
+  const chartH = 120;
+  const bars = daily.map((d, i) => {
+    const h = Math.max(1, Math.round(((d.qty || 0) / maxQty) * (chartH - 20)));
+    const x = i * (barW + 2);
+    return '<rect x="' + x + '" y="' + (chartH - 20 - h) + '" width="' + barW + '" height="' + h + '" rx="2" fill="var(--sage)" opacity="0.8"><title>' + d.date + ': ' + (d.qty||0) + ' units</title></rect>';
+  }).join('');
+  const totalW = daily.length * (barW + 2);
+  // X-axis labels — show ~5 evenly spaced
+  const labelCount = Math.min(5, daily.length);
+  const step = Math.max(1, Math.floor(daily.length / labelCount));
+  const labels = daily.filter((_, i) => i % step === 0 || i === daily.length - 1).map((d, idx) => {
+    const i = daily.indexOf(d);
+    const x = i * (barW + 2) + barW / 2;
+    const parts = d.date.split('-');
+    return '<text x="' + x + '" y="' + (chartH - 4) + '" text-anchor="middle" fill="rgba(54,58,46,0.4)" font-size="9" font-family="inherit">' + parseInt(parts[1]) + '/' + parseInt(parts[2]) + '</text>';
+  }).join('');
+  return '<div style="overflow-x:auto;padding:8px 0;"><svg width="' + Math.max(totalW, 100) + '" height="' + chartH + '" style="display:block;">' + bars + labels + '</svg></div>';
+}
+
+function renderItemDetail() {
+  const d = _itemSelected;
+  const detail = document.getElementById('item-detail');
   if (!d) return;
 
-  const p = _itemPeriod;
-  let qty, rev, label;
-  if (p === 'wtd')  { qty = d.qty7  || 0; rev = d.rev7  || 0; label = 'Week to Date'; }
-  else if (p === 'mtd') { qty = d.qty30 || 0; rev = d.rev30 || 0; label = 'Month to Date'; }
-  else if (p === 'ytd') { qty = d.qtyYTD || d.qtyAll || 0; rev = d.revYTD || d.revAll || 0; label = 'Year to Date'; }
-  else { qty = d.qtyAll || 0; rev = d.revAll || 0; label = 'All Time'; }
+  const name = d.name || d.itemName || 'Item';
+  const category = d.category || d.group || '';
+  const daily = d.daily || [];
+  const filtered = filterDaily(daily, _itemPeriod);
 
-  const avgPrice = qty > 0 ? (rev / qty) : 0;
-  const lastSale = d.lastSaleDate || d.lastDate || null;
+  const totalQty = d.totalQty || filtered.reduce((s, r) => s + (r.qty || 0), 0);
+  const totalRev = d.totalRev || filtered.reduce((s, r) => s + (r.rev || 0), 0);
+  const avgPrice = totalQty > 0 ? totalRev / totalQty : 0;
+
+  const lastSale = d.lastSaleDate || d.lastDate || (daily.length ? daily[daily.length - 1].date : null);
+  const firstSale = d.firstSaleDate || d.firstDate || (daily.length ? daily[0].date : null);
   const daysSince = lastSale ? Math.floor((new Date() - new Date(lastSale)) / 86400000) : null;
+  const daySpan = (firstSale && lastSale) ? Math.max(1, Math.floor((new Date(lastSale) - new Date(firstSale)) / 86400000)) : null;
+  const velocity = (totalQty > 0 && daySpan) ? ((totalQty / daySpan) * 7).toFixed(1) : '—';
 
-  let slowFlag = '';
-  if (daysSince !== null && daysSince > 30) {
-    slowFlag = '<span style="background:#C0392B;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:8px;">Slow Mover · ' + daysSince + 'd</span>';
-  } else if (daysSince !== null && daysSince > 14) {
-    slowFlag = '<span style="background:#E67E22;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:8px;">Watch · ' + daysSince + 'd</span>';
+  // Days-since badge
+  let badge = '';
+  if (daysSince !== null) {
+    const bgColor = daysSince > 14 ? '#C0392B' : daysSince > 7 ? '#E67E22' : '#2E7D32';
+    badge = '<span style="background:' + bgColor + ';color:white;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-left:10px;">' + daysSince + 'd since last sale</span>';
   }
 
-  results.innerHTML = `
-    <div style="margin-bottom:16px;">
-      <div style="font-size:18px;font-weight:700;color:var(--green);">${d.name || d.itemName || 'Item'}${slowFlag}</div>
-      ${d.category ? '<div style="font-size:12px;color:rgba(54,58,46,0.5);margin-top:2px;">' + d.category + '</div>' : ''}
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:20px;">
-      <button class="filter-btn item-period-btn ${p==='wtd'?'active':''}" onclick="setItemPeriod('wtd',this)">WTD</button>
-      <button class="filter-btn item-period-btn ${p==='mtd'?'active':''}" onclick="setItemPeriod('mtd',this)">MTD</button>
-      <button class="filter-btn item-period-btn ${p==='ytd'?'active':''}" onclick="setItemPeriod('ytd',this)">YTD</button>
-      <button class="filter-btn item-period-btn ${p==='all'?'active':''}" onclick="setItemPeriod('all',this)">All Time</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
-      <div class="stat-card">
-        <div class="stat-label">Qty Sold</div>
-        <div class="stat-value small">${qty.toLocaleString()}</div>
-        <div class="stat-meta">${label}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Revenue</div>
-        <div class="stat-value small">${fmtMoney(rev)}</div>
-        <div class="stat-meta">${label}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg Price</div>
-        <div class="stat-value small">$${avgPrice.toFixed(2)}</div>
-        <div class="stat-meta">per unit</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
-      <div class="stat-card">
-        <div class="stat-label">Last Sale</div>
-        <div class="stat-value small" style="font-size:16px;">${lastSale ? fmtDate(lastSale) : '—'}</div>
-        <div class="stat-meta">${daysSince !== null ? daysSince + ' days ago' : ''}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Unit Cost</div>
-        <div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">ME pending</div>
-        <div class="stat-meta">Awaiting Margin Edge data</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Margin</div>
-        <div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">ME pending</div>
-        <div class="stat-meta">Awaiting Margin Edge data</div>
-      </div>
-    </div>`;
+  // Slow mover alert
+  let slowAlert = '';
+  if (daysSince !== null && daysSince > 14) {
+    const isRed = daysSince > 30;
+    slowAlert = '<div style="background:' + (isRed ? '#FFEBEE' : '#FFF3E0') + ';border:1px solid ' + (isRed ? '#C0392B' : '#E67E22') + ';border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">' +
+      '<span style="font-size:20px;">' + (isRed ? '🔴' : '🟡') + '</span>' +
+      '<div><div style="font-size:13px;font-weight:700;color:' + (isRed ? '#C0392B' : '#E67E22') + ';">' + (isRed ? 'Slow Mover Alert' : 'Watch List') + '</div>' +
+      '<div style="font-size:12px;color:rgba(54,58,46,0.6);">Last sold ' + daysSince + ' days ago — ' + (isRed ? 'consider discontinuing or promoting' : 'monitor for continued decline') + '</div></div></div>';
+  }
+
+  const p = _itemPeriod;
+  const periodLabel = p === 'wtd' ? 'Week to Date' : p === 'mtd' ? 'Month to Date' : p === 'ytd' ? 'Year to Date' : 'All Time';
+
+  detail.innerHTML =
+    '<div style="margin-bottom:16px;">' +
+      '<div style="display:flex;align-items:center;flex-wrap:wrap;">' +
+        '<span style="font-size:20px;font-weight:700;color:var(--green);">' + name + '</span>' + badge +
+      '</div>' +
+      (category ? '<div style="font-size:12px;color:rgba(54,58,46,0.5);margin-top:3px;">' + category + '</div>' : '') +
+    '</div>' +
+    slowAlert +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">' +
+      '<div class="stat-card"><div class="stat-label">Total Qty Sold</div><div class="stat-value small">' + totalQty.toLocaleString() + '</div><div class="stat-meta">' + periodLabel + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value small">' + fmtMoney(totalRev) + '</div><div class="stat-meta">' + periodLabel + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Avg Price</div><div class="stat-value small">$' + avgPrice.toFixed(2) + '</div><div class="stat-meta">per unit</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Velocity</div><div class="stat-value small">' + velocity + '</div><div class="stat-meta">units / week</div></div>' +
+    '</div>' +
+    '<div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);padding:16px 20px;margin-bottom:20px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
+        '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);">Daily Sales</div>' +
+        '<div style="display:flex;gap:6px;">' +
+          '<button class="filter-btn item-period-btn ' + (p==='wtd'?'active':'') + '" onclick="setItemPeriod(\'wtd\',this)" style="padding:4px 12px;font-size:11px;">WTD</button>' +
+          '<button class="filter-btn item-period-btn ' + (p==='mtd'?'active':'') + '" onclick="setItemPeriod(\'mtd\',this)" style="padding:4px 12px;font-size:11px;">MTD</button>' +
+          '<button class="filter-btn item-period-btn ' + (p==='ytd'?'active':'') + '" onclick="setItemPeriod(\'ytd\',this)" style="padding:4px 12px;font-size:11px;">YTD</button>' +
+          '<button class="filter-btn item-period-btn ' + (p==='all'?'active':'') + '" onclick="setItemPeriod(\'all\',this)" style="padding:4px 12px;font-size:11px;">All Time</button>' +
+        '</div>' +
+      '</div>' +
+      buildChart(filtered) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
+      '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Margin</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Cost Status</div><div class="stat-value small" style="font-size:14px;color:rgba(54,58,46,0.3);">Pending</div><div class="stat-meta">Cost data pending ME recipe builds</div></div>' +
+    '</div>';
 }
 </script>
 </body>
