@@ -834,8 +834,10 @@ function initApp() {
   document.getElementById('dash-greeting').textContent = greet + ', Carlie.';
   document.getElementById('dash-date-sub').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   loadDashboard();
-  // Load ME cost data
+  // Load ME data files
   fetch('/me_cost_lookup.json').then(r => r.json()).then(d => { window.ME_COSTS = d; }).catch(() => { window.ME_COSTS = null; });
+  fetch('/inv_lookup.json').then(r => r.json()).then(d => { window.INV_DATA = d; }).catch(() => { window.INV_DATA = null; });
+  fetch('/waste_lookup.json').then(r => r.json()).then(d => { window.WASTE_DATA = d; }).catch(() => { window.WASTE_DATA = null; });
 }
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
@@ -1421,17 +1423,39 @@ function buildChart(daily) {
   return '<div style="overflow-x:auto;padding:8px 0;"><svg width="' + Math.max(totalW, 100) + '" height="' + chartH + '" style="display:block;">' + bars + labels + '</svg></div>';
 }
 
-function lookupMECost(itemName) {
-  if (!window.ME_COSTS || !itemName) return null;
-  const key = itemName.toLowerCase();
-  // Exact match
-  if (window.ME_COSTS[key]) return window.ME_COSTS[key];
-  // Partial: find first key that contains or is contained by the item name
-  const keys = Object.keys(window.ME_COSTS);
+function fuzzyLookup(store, itemName) {
+  if (!store || !itemName) return null;
+  const key = itemName.toLowerCase().trim();
+  // 1. Exact match
+  if (store[key]) return { data: store[key], matchedKey: key };
+  const keys = Object.keys(store);
+  // 2. All words from item name appear in a key
+  const words = key.split(/\s+/).filter(w => w.length > 2);
+  if (words.length > 0) {
+    for (let i = 0; i < keys.length; i++) {
+      if (words.every(w => keys[i].includes(w))) return { data: store[keys[i]], matchedKey: keys[i] };
+    }
+  }
+  // 3. Item name contains a key or key contains item name
   for (let i = 0; i < keys.length; i++) {
-    if (key.includes(keys[i]) || keys[i].includes(key)) return window.ME_COSTS[keys[i]];
+    if (key.includes(keys[i]) || keys[i].includes(key)) return { data: store[keys[i]], matchedKey: keys[i] };
   }
   return null;
+}
+
+function lookupMECost(itemName) {
+  const result = fuzzyLookup(window.ME_COSTS, itemName);
+  return result ? { ...result.data, _matchedKey: result.matchedKey } : null;
+}
+
+function lookupInv(itemName) {
+  const result = fuzzyLookup(window.INV_DATA, itemName);
+  return result ? result.data : null;
+}
+
+function lookupWaste(itemName) {
+  const result = fuzzyLookup(window.WASTE_DATA, itemName);
+  return result ? result.data : null;
 }
 
 function renderItemDetail() {
@@ -1472,6 +1496,8 @@ function renderItemDetail() {
   }
 
   const me = lookupMECost(name);
+  const inv = lookupInv(name);
+  const waste = lookupWaste(name);
   const p = _itemPeriod;
   const periodLabel = p === 'wtd' ? 'Week to Date' : p === 'mtd' ? 'Month to Date' : p === 'ytd' ? 'Year to Date' : p === 'custom' ? 'Custom Range' : 'All Time';
 
@@ -1509,11 +1535,13 @@ function renderItemDetail() {
     '</div>' +
     '<div style="background:white;border-radius:12px;border:1.5px solid rgba(54,58,46,0.1);padding:16px 20px;margin-bottom:20px;">' +
       '<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Inventory Estimate</div>' +
-      '<div style="font-size:11px;color:rgba(54,58,46,0.35);margin-bottom:14px;font-family:monospace;">Starting &minus; Sold &minus; Waste + Purchases = On Hand</div>' +
+      '<div style="font-size:11px;color:rgba(54,58,46,0.35);margin-bottom:4px;font-family:monospace;">Starting &minus; Sold &minus; Waste + Purchases = On Hand</div>' +
+      '<div style="font-size:10px;color:rgba(54,58,46,0.3);margin-bottom:14px;">Data sourced from ME exports — not live. Refresh exports to update.</div>' +
       '<div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;">' +
         '<div style="flex:1;min-width:100px;">' +
           '<div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Starting Inv.</div>' +
-          '<input type="number" id="startingInventory" placeholder="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:var(--green);box-sizing:border-box;" oninput="updateOnHand()">' +
+          '<input type="number" id="startingInventory" placeholder="0" min="0" value="' + (inv ? Math.round(inv.count) : '') + '" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:var(--green);box-sizing:border-box;" oninput="updateOnHand()">' +
+          (inv ? '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;">' + Math.round(inv.count) + ' ' + (inv.unit || 'units') + '</div><div style="font-size:8px;color:#E67E22;margin-top:1px;text-align:center;">⚠️ Stale — from ME inventory export</div>' : '') +
         '</div>' +
         '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">−</div>' +
         '<div class="stat-card" style="flex:1;min-width:100px;margin:0;">' +
@@ -1524,8 +1552,8 @@ function renderItemDetail() {
         '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">−</div>' +
         '<div style="flex:1;min-width:100px;">' +
           '<div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(54,58,46,0.5);margin-bottom:4px;">Waste / Shrink</div>' +
-          '<input type="number" id="inv-waste" placeholder="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:#E67E22;box-sizing:border-box;" oninput="updateOnHand()">' +
-          '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;">Manual — ME waste tracking coming</div>' +
+          '<input type="number" id="inv-waste" placeholder="0" min="0" value="' + (waste ? Math.round(waste.totalQty) : '') + '" style="width:100%;padding:8px 10px;border:1.5px solid rgba(54,58,46,0.2);border-radius:8px;font-size:18px;font-weight:700;font-family:inherit;text-align:center;color:#E67E22;box-sizing:border-box;" oninput="updateOnHand()">' +
+          (waste ? '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;">$' + waste.totalValue.toFixed(2) + ' value · ' + waste.entries + ' entries</div><div style="font-size:8px;color:#E67E22;margin-top:1px;text-align:center;">⚠️ Stale — from ME waste export</div>' : '<div style="font-size:9px;color:rgba(54,58,46,0.35);margin-top:3px;text-align:center;">Manual entry</div>') +
         '</div>' +
         '<div style="font-size:22px;font-weight:700;color:rgba(54,58,46,0.25);padding:16px 8px 0;">+</div>' +
         '<div style="flex:1;min-width:100px;">' +
@@ -1546,7 +1574,8 @@ function renderItemDetail() {
           '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small">$' + parseFloat(me.cost).toFixed(2) + '</div><div class="stat-meta">' + (me.type || '') + '</div></div>' +
           '<div class="stat-card"><div class="stat-label">Cost %</div><div class="stat-value small" style="color:' + (parseFloat(me.costPct) > 35 ? '#C0392B' : parseFloat(me.costPct) > 28 ? '#E67E22' : '#2E7D32') + ';">' + me.costPct + '%</div><div class="stat-meta">of $' + parseFloat(me.menuPrice).toFixed(2) + ' menu price</div></div>' +
           '<div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value small" style="color:#2E7D32;">$' + parseFloat(me.netProfit).toFixed(2) + '</div><div class="stat-meta" style="color:#2E7D32;">Live — ME export 4/22/26</div></div>' +
-        '</div>'
+        '</div>' +
+        (me._matchedKey && me._matchedKey !== name.toLowerCase() ? '<div style="font-size:10px;color:rgba(54,58,46,0.3);margin-top:6px;">Matched ME recipe: ' + (me.name || me._matchedKey) + '</div>' : '')
       : '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">' +
           '<div class="stat-card"><div class="stat-label">Unit Cost</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
           '<div class="stat-card"><div class="stat-label">Cost %</div><div class="stat-value small" style="font-size:16px;color:rgba(54,58,46,0.3);">—</div><div class="stat-meta">ME pending</div></div>' +
