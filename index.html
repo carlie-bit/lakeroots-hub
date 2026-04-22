@@ -1299,7 +1299,7 @@ function toggleResolved() {
 // ── ITEM LOOKUP ─────────────────────────────────────────────
 let _itemSearchData = null;
 let _itemSelected = null;
-let _itemPeriod = 'wtd';
+let _itemPeriod = 'all';
 
 async function searchItem() {
   const query = document.getElementById('item-search-input').value.trim();
@@ -1325,7 +1325,7 @@ async function searchItem() {
       selectItem(names[0]);
     } else if (data.name) {
       _itemSelected = data;
-      _itemPeriod = 'wtd';
+      _itemPeriod = 'all';
       renderItemDetail();
     }
   } catch(e) {
@@ -1337,7 +1337,7 @@ function selectItem(name) {
   const results = (_itemSearchData && _itemSearchData.results) || [];
   const item = results.find(r => r.name === name) || _itemSearchData;
   _itemSelected = item;
-  _itemPeriod = 'wtd';
+  _itemPeriod = 'all';
   // Highlight active pill
   document.querySelectorAll('#item-pills button').forEach(b => {
     const active = b.textContent === name;
@@ -1406,8 +1406,8 @@ function renderItemDetail() {
   const daily = d.daily || [];
   const filtered = filterDaily(daily, _itemPeriod);
 
-  const totalQty = d.totalQty || filtered.reduce((s, r) => s + (r.qty || 0), 0);
-  const totalRev = d.totalRev || filtered.reduce((s, r) => s + (r.rev || 0), 0);
+  const totalQty = filtered.reduce((s, r) => s + (r.qty || 0), 0) || d.totalQty || 0;
+  const totalRev = filtered.reduce((s, r) => s + (r.rev || 0), 0) || d.totalRev || 0;
   const avgPrice = totalQty > 0 ? totalRev / totalQty : 0;
 
   const lastSale = d.lastSaleDate || d.lastDate || (daily.length ? daily[daily.length - 1].date : null);
