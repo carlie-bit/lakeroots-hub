@@ -769,6 +769,8 @@
 const PROXY = 'https://effervescent-bienenstitch-c0ba8a.netlify.app/.netlify/functions/proxy';
 const PIN   = '8888';
 let _snapCache = null;
+let _catCache  = null;
+let _lifeCache = null;
 
 // ── AUTH ────────────────────────────────────────────────────
 function checkPin() {
@@ -859,12 +861,16 @@ function initApp() {
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
 async function loadDashboard() {
-  if (!_snapCache) {
+  const needsFetch = !_snapCache || !_catCache || !_lifeCache;
+  if (needsFetch) {
     document.getElementById('dash-stats').innerHTML =
       '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Fetching live data...</div>';
     try {
-      const res  = await fetch(PROXY + '?action=snapshot');
-      _snapCache = await res.json();
+      const fetches = [];
+      if (!_snapCache) fetches.push(fetch(PROXY + '?action=snapshot').then(r => r.json()).then(d => { _snapCache = d; }));
+      if (!_catCache)  fetches.push(fetch(PROXY + '?action=catsales').then(r => r.json()).then(d => { _catCache = d; }));
+      if (!_lifeCache) fetches.push(fetch(PROXY + '?action=lifetime').then(r => r.json()).then(d => { _lifeCache = d; }));
+      await Promise.all(fetches);
     } catch(e) {
       document.getElementById('dash-stats').innerHTML =
         '<div class="loading" style="grid-column:1/-1">⚠️ Could not load — check connection</div>';
@@ -873,72 +879,60 @@ async function loadDashboard() {
   }
   renderDashboard(_snapCache);
   loadTopItemsForPeriod();
+  loadRetailForPeriod();
 }
 
 function renderDashboard(d) {
-  const ss = d.salesSummary || {};
-  const meta = d.meta || {};
+  // Period label for dynamic cards
+  const filterLabels = {
+    today: 'Today', yesterday: 'Yesterday', wtd: 'Week to Date',
+    mtd: 'Month to Date', 'last-month': 'Last Month', ytd: 'Year to Date'
+  };
+  const periodLabel = filterLabels[currentFilter] || 'This Period';
 
-  // Pick the right period
-  let sales, checks, label;
-  if (currentFilter === 'today') {
-    sales = 0; checks = 0; label = 'Today';
-    // Will be filled by loadTodayCard automatically
-    loadTodayCard();
-  } else if (currentFilter === 'yesterday') {
-    const todayStr = new Date().toISOString().slice(0,10);
-    const realDays = (d.last14Days || []).filter(r => r.date <= todayStr && r.checks > 5);
-    const yest = realDays[0] || {};
-    sales  = yest.sales  || 0;
-    checks = yest.checks || 0;
-    label  = yest.date   ? fmtDate(yest.date) : 'Yesterday';
-  } else if (currentFilter === 'wtd') {
-    sales = ss.wtd?.sales || 0; checks = ss.wtd?.checks || 0; label = 'Week to Date';
-  } else if (currentFilter === 'mtd') {
-    sales = ss.mtd?.sales || 0; checks = ss.mtd?.checks || 0; label = 'Month to Date';
-  } else if (currentFilter === 'last-month') {
-    sales = ss.lastMonth?.sales || 0; checks = ss.lastMonth?.checks || 0; label = 'Last Month';
-  } else if (currentFilter === 'ytd') {
-    sales = ss.ytd?.sales || 0; checks = ss.ytd?.checks || 0; label = 'Year to Date';
-  } else {
-    sales = ss.mtd?.sales || 0; checks = ss.mtd?.checks || 0; label = 'This Period';
+  // Category data for the selected period
+  const catMap = { today:'today', yesterday:'yesterday', wtd:'wtd', mtd:'mtd', 'last-month':'lastMonth', ytd:'ytd' };
+  const catPeriod = _catCache ? _catCache[catMap[currentFilter] || 'mtd'] : null;
+  const food      = catPeriod ? catPeriod.food      : null;
+  const coffeeBar = catPeriod ? catPeriod.coffeeBar : null;
+  const bar       = catPeriod ? catPeriod.bar       : null;
+  const retail    = catPeriod ? catPeriod.retail     : null;
+
+  // Lifetime data for card 5
+  const lifeSales = _lifeCache ? _lifeCache.sales : null;
+  let lifeDateLabel = 'Since Inception';
+  if (_lifeCache && _lifeCache.firstDate) {
+    const fd = new Date(_lifeCache.firstDate + 'T12:00:00');
+    lifeDateLabel = 'Since ' + fd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   }
 
-  const avgCheck = checks > 0 ? (sales / checks).toFixed(2) : '—';
-  const estCogs  = sales * 0.30;
-  const cogs     = sales * 0.30;
-  const grossProfit = sales - cogs;
-  const grossMargin = sales > 0 ? ((grossProfit / sales) * 100).toFixed(1) : '—';
-
   document.getElementById('dash-stats').innerHTML = `
-    <div class="stat-card" id="card-today" style="cursor:pointer;" onclick="loadTodayCard()">
-      <div class="stat-label">Today So Far ↻</div>
-      <div class="stat-value small" id="today-sales" style="font-size:20px;color:rgba(54,58,46,0.3);">tap to load</div>
-      <div class="stat-meta" id="today-meta">Live from Toast · tap to refresh</div>
+    <div class="stat-card green">
+      <div class="stat-label">FOOD &middot; ${periodLabel}</div>
+      <div class="stat-value small">${food != null ? fmtMoney(food) : '—'}</div>
+      <div class="stat-meta">Category sales</div>
     </div>
-    <div class="stat-card" id="card-dowavg">
-      <div class="stat-label" id="dowavg-label">Avg for Today's DOW</div>
-      <div class="stat-value small" id="dowavg-value" style="font-size:20px;color:rgba(54,58,46,0.3);">loading...</div>
-      <div class="stat-meta" id="dowavg-meta">Fetching historical average...</div>
+    <div class="stat-card sage">
+      <div class="stat-label">COFFEE BAR &middot; ${periodLabel}</div>
+      <div class="stat-value small">${coffeeBar != null ? fmtMoney(coffeeBar) : '—'}</div>
+      <div class="stat-meta">Category sales</div>
     </div>
-    <div class="stat-card" id="card-cogs" onclick="window.open('https://claude.ai/chat/3c34d5f1-e219-4de8-a406-8baf4ce3ad04','_blank')" style="cursor:pointer;">
-      <div class="stat-label">Est. COGS (30% — tap to fix)</div>
-      <div class="stat-value small" id="cogs-value">${fmtMoney(estCogs)}</div>
-      <div class="stat-meta">Complete ME recipes for actuals →</div>
-    </div>
-    <div class="stat-card sage" id="card-gross">
-      <div class="stat-label">Est. Gross Profit</div>
-      <div class="stat-value small" id="gross-value">${fmtMoney(grossProfit)}</div>
-      <div class="stat-meta" id="gross-meta">${grossMargin}% margin</div>
+    <div class="stat-card">
+      <div class="stat-label">BAR &middot; ${periodLabel}</div>
+      <div class="stat-value small">${bar != null ? fmtMoney(bar) : '—'}</div>
+      <div class="stat-meta">Category sales</div>
     </div>
     <div class="stat-card brown">
-      <div class="stat-label">Best Day (Ever)</div>
-      <div class="stat-value small">${ss.bestDay ? fmtMoney(ss.bestDay.sales) : '—'}</div>
-      <div class="stat-meta">${ss.bestDay ? fmtDate(ss.bestDay.date) + (ss.bestDay.checks > 0 ? ' · ' + ss.bestDay.checks + ' checks' : '') : ''}</div>
+      <div class="stat-label">RETAIL &middot; ${periodLabel}</div>
+      <div class="stat-value small">${retail != null ? fmtMoney(retail) : '—'}</div>
+      <div class="stat-meta">Category sales</div>
+    </div>
+    <div class="stat-card" style="border-top:2px solid #B68036;">
+      <div class="stat-label">TOTAL SALES</div>
+      <div class="stat-value small">${lifeSales != null ? fmtMoney(lifeSales) : '—'}</div>
+      <div class="stat-meta">${lifeDateLabel}</div>
     </div>
   `;
-
-  loadDowAvg();
 
   const sub = document.getElementById('dash-date-sub');
   if (sub && d.meta?.generatedAt) {
@@ -968,9 +962,6 @@ function renderDashboard(d) {
         </tr>`).join('')}
       </tbody>
     </table>`;
-
-  loadRetailForPeriod();
-  loadTodayCard();
 }
 
 // ── ACCOUNTABILITY DATA ──────────────────────────────────────
@@ -1059,23 +1050,9 @@ async function loadTodayCard() {
     el.style.fontSize = '28px';
     el.style.fontWeight = '600';
     if (elMeta) elMeta.textContent = items + ' items · as of ' + timeStr + ' CT · tap to refresh';
-    // Update COGS/Gross Profit if today filter is active
-    if (currentFilter === 'today') updateCogsCards(sales);
   } catch(e) {
     if (el) { el.textContent = 'unavailable'; el.style.color = 'rgba(54,58,46,0.3)'; }
   }
-}
-
-function updateCogsCards(sales) {
-  const cogs = sales * 0.30;
-  const gross = sales - cogs;
-  const margin = sales > 0 ? ((gross / sales) * 100).toFixed(1) : '—';
-  const cogsEl = document.getElementById('cogs-value');
-  const grossEl = document.getElementById('gross-value');
-  const grossMeta = document.getElementById('gross-meta');
-  if (cogsEl) cogsEl.textContent = fmtMoney(cogs);
-  if (grossEl) grossEl.textContent = fmtMoney(gross);
-  if (grossMeta) grossMeta.textContent = margin + '% margin';
 }
 
 async function loadTopItemsForPeriod() {
@@ -1083,23 +1060,18 @@ async function loadTopItemsForPeriod() {
   const bodyEl  = document.getElementById('dash-top-body');
   if (!bodyEl) return;
 
-  let action, title;
-  if (currentFilter === 'ytd') { action = 'topytd'; title = '🔥 Top 10 YTD'; }
-  else if (currentFilter === 'last-month') { action = 'topmtd'; title = '🔥 Top 10 Last Month'; }
-  else if (currentFilter === 'mtd') { action = 'topmtd'; title = '🔥 Top 10 This Month'; }
-  else if (currentFilter === 'wtd') { action = 'topwtd'; title = '🔥 Top 10 This Week'; }
-  else if (currentFilter === 'yesterday') { action = null; title = '🔥 Top 10 This Week'; }
-  else if (currentFilter === 'today') { action = null; title = '🔥 Top 10 This Week'; }
-  else { action = null; title = '🔥 Top 10 This Week'; }
+  const topActions = {
+    today: 'toptoday', yesterday: 'topyesterday', wtd: 'topwtd',
+    mtd: 'topmtd', 'last-month': 'toplastmonth', ytd: 'topytd'
+  };
+  const titleLabels = {
+    today: 'Today', yesterday: 'Yesterday', wtd: 'This Week',
+    mtd: 'This Month', 'last-month': 'Last Month', ytd: 'YTD'
+  };
+  const action = topActions[currentFilter] || 'topwtd';
+  const title  = '🔥 Top 10 ' + (titleLabels[currentFilter] || 'This Week');
 
   if (titleEl) titleEl.textContent = title;
-
-  if (!action) {
-    const top = (_snapCache?.top20ThisWeek || []).slice(0, 10);
-    renderTopItems(top, 'qty7', 'rev7');
-    return;
-  }
-
   bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     const res  = await fetch(PROXY + '?action=' + action);
@@ -1134,33 +1106,26 @@ async function loadRetailForPeriod() {
   const bodyEl  = document.getElementById('dash-retail-body');
   if (!bodyEl) return;
 
-  let title;
-  if (currentFilter === 'ytd')           title = '🏪 Top Retail YTD';
-  else if (currentFilter === 'last-month') title = '🏪 Top Retail Last Month';
-  else if (currentFilter === 'mtd')      title = '🏪 Top Retail This Month';
-  else if (currentFilter === 'wtd')      title = '🏪 Top Retail This Week';
-  else                                   title = '🏪 Top Retail This Week';
+  const topActions = {
+    today: 'toptoday', yesterday: 'topyesterday', wtd: 'topwtd',
+    mtd: 'topmtd', 'last-month': 'toplastmonth', ytd: 'topytd'
+  };
+  const titleLabels = {
+    today: 'Today', yesterday: 'Yesterday', wtd: 'This Week',
+    mtd: 'This Month', 'last-month': 'Last Month', ytd: 'YTD'
+  };
+  const action = topActions[currentFilter] || 'topwtd';
+  const title  = '🏪 Top Retail ' + (titleLabels[currentFilter] || 'This Week');
+
   if (titleEl) titleEl.textContent = title;
-
-  let action = null;
-  if (currentFilter === 'ytd') action = 'retailytd';
-  else if (currentFilter === 'last-month' || currentFilter === 'mtd') action = 'retailmtd';
-  else if (currentFilter === 'wtd') action = 'retailwtd';
-
-  if (action) {
-    bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    try {
-      const res = await fetch(PROXY + '?action=' + action);
-      const data = await res.json();
-      const items = data.items || [];
-      renderRetailItems(items, 'qty', 'rev', bodyEl);
-    } catch(e) {
-      bodyEl.innerHTML = '<div class="loading">⚠️ Could not load</div>';
-    }
-  } else {
-    if (!_snapCache) return;
-    const retail = (_snapCache.retailSummary?.topRetailThisWeek || []).slice(0, 10);
-    renderRetailItems(retail, 'qty7', 'rev7', bodyEl);
+  bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const res  = await fetch(PROXY + '?action=' + action + '&cat=retail');
+    const data = await res.json();
+    renderRetailItems(data.items || [], 'qty', 'rev', bodyEl);
+    if (titleEl && data.startDate) titleEl.textContent = title + ' · ' + data.startDate + ' – ' + data.endDate;
+  } catch(e) {
+    bodyEl.innerHTML = '<div class="loading">⚠️ Could not load</div>';
   }
 }
 
