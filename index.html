@@ -866,21 +866,26 @@ function initApp() {
 
 // ── DASHBOARD DATA ───────────────────────────────────────────
 async function loadDashboard() {
-  const needsFetch = !_snapCache || !_catCache || !_lifeCache;
-  if (needsFetch) {
+  if (!_snapCache) {
     document.getElementById('dash-stats').innerHTML =
       '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Fetching live data...</div>';
     try {
-      const fetches = [];
-      if (!_snapCache) fetches.push(fetch(PROXY + '?action=snapshot').then(r => r.json()).then(d => { _snapCache = d; }));
-      if (!_catCache)  fetches.push(fetch(PROXY + '?action=catsales').then(r => r.json()).then(d => { _catCache = d; }));
-      if (!_lifeCache) fetches.push(fetch(PROXY + '?action=lifetime').then(r => r.json()).then(d => { _lifeCache = d; }));
-      await Promise.all(fetches);
+      const res  = await fetch(PROXY + '?action=snapshot');
+      _snapCache = await res.json();
     } catch(e) {
       document.getElementById('dash-stats').innerHTML =
         '<div class="loading" style="grid-column:1/-1">⚠️ Could not load — check connection</div>';
       return;
     }
+  }
+  // Category + lifetime fetches are non-fatal — dashboard still renders if these fail
+  if (!_catCache) {
+    try { const r = await fetch(PROXY + '?action=catsales'); _catCache = await r.json(); }
+    catch(e) { _catCache = {}; }
+  }
+  if (!_lifeCache) {
+    try { const r = await fetch(PROXY + '?action=lifetime'); _lifeCache = await r.json(); }
+    catch(e) { _lifeCache = {}; }
   }
   renderDashboard(_snapCache);
   loadTopItemsForPeriod();
