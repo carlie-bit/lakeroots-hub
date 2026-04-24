@@ -546,22 +546,31 @@
         <div class="loading"><div class="spinner"></div> Loading live data...</div>
       </div>
 
-      <!-- Stats Row 2: Category + Lifetime cards -->
-      <div class="stats-grid" id="dash-stats-row2" style="margin-top:12px;">
+      <!-- Sales_History pipeline banner — remove once data is rebuilt -->
+      <div style="background:#FCFBE4;border:2px solid #B68036;border-radius:8px;padding:16px 20px;margin:20px 0;color:#583B1F;font-family:inherit;line-height:1.5;">
+        <strong style="color:#4F5854;font-size:1.05em;">⚠ Sales_History data pipeline under repair.</strong><br>
+        Category breakdowns (Food / Coffee Bar / Bar / Retail), lifetime total, Top 10 items, and Top Retail items are temporarily hidden while we diagnose and rebuild the item-level sales feed. <strong>Top-line daily totals (Row 1 cards + Recent Days table) remain accurate</strong> — those come from Toast order totals, not line items.
+      </div>
+
+      <!-- Stats Row 2: Category + Lifetime cards — HIDDEN pending Sales_History rebuild -->
+      <div class="stats-grid" id="dash-stats-row2" style="display:none;margin-top:12px;">
         <div class="loading"><div class="spinner"></div></div>
       </div>
 
       <!-- Last 14 days + Top items -->
       <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:20px;margin-bottom:20px;" class="dash-two-col">
-        <div class="section-card" id="dash-recent-card">
+        <!-- grid-column spans full width while Top 10 / Top Retail are hidden; revert to auto when restoring -->
+        <div class="section-card" id="dash-recent-card" style="grid-column:1/-1;">
           <div class="section-card-title">📅 Recent Days</div>
           <div id="dash-recent-body"><div class="loading"><div class="spinner"></div></div></div>
         </div>
-        <div class="section-card" id="dash-top-card">
+        <!-- HIDDEN pending Sales_History rebuild -->
+        <div class="section-card" id="dash-top-card" style="display:none;">
           <div class="section-card-title" id="top-items-title">🔥 Top Items This Week</div>
           <div id="dash-top-body"><div class="loading"><div class="spinner"></div></div></div>
         </div>
-        <div class="section-card">
+        <!-- HIDDEN pending Sales_History rebuild -->
+        <div class="section-card" style="display:none;">
           <div class="section-card-title" id="retail-title">🏪 Top Retail This Week</div>
           <div id="dash-retail-body"><div class="loading"><div class="spinner"></div></div></div>
         </div>
