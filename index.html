@@ -775,7 +775,6 @@
 </div>
 
 <script>
-let _vendorData = [];
 const PROXY = 'https://effervescent-bienenstitch-c0ba8a.netlify.app/.netlify/functions/proxy';
 const PIN   = '8888';
 let _snapCache = null;
@@ -832,7 +831,7 @@ function nav(pageId) {
   if (pageId === 'reviews') loadReviews();
   if (pageId === 'open-items') loadOpenItems();
   if (pageId === 'itemlookup') document.getElementById('item-search-input').focus();
-  if (pageId === 'vendors') loadVendors();
+  if (pageId === 'vendors') renderVendorTable();
 }
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1684,28 +1683,12 @@ function updateOnHand() {
 }
 
 // ── VENDOR DATABASE ─────────────────────────────────────────
+const _vendorData = [
+  {num:"101",name:"The Chefs' Warehouse Midwest LLC",nickname:"Chefs' Warehouse",type:"COGS",sub:"Food",orderDay:"Mon/Thu",payment:"ACH",rep:"Araceli",phone:"773-805-6281",email:"",deadline:"Day before by 5pm",leadTime:"1 day",moq:"$200 min",delivery:"Next day",orderProcess:"Online portal",terms:"Net 14",remitEmail:"",freeShipping:"$300+",barcodes:"No",expiration:"",address:"3839 W 47th Pl, Chicago IL 60632",notes:"Good specialty/protein selection. Ask Araceli for weekly specials list."},
+  {num:"102",name:"Sysco Chicago, Inc.",nickname:"Sysco",type:"COGS",sub:"Food",orderDay:"Mon/Fri",payment:"ACH",rep:"Neil",phone:"224-645-5939",email:"",deadline:"Day before by 6pm",leadTime:"1 day",moq:"$250 min",delivery:"Next day",orderProcess:"Sysco Online / app",terms:"Net 10",remitEmail:"",freeShipping:"$350+",barcodes:"Yes",expiration:"",address:"250 Wieboldt Dr, Des Plaines IL 60016",notes:"Primary broadline. Neil is responsive — text for urgent orders."},
+  {num:"305",name:"Southern Glazier's Wine and Spirits",nickname:"Southern Wine & Spirits",type:"COGS",sub:"Bar",orderDay:"Tue",payment:"Check COD",rep:"Matt/Bob/Joe/Janet",phone:"800-776-0180",email:"",deadline:"Monday by noon",leadTime:"1 day",moq:"None",delivery:"Tuesday",orderProcess:"Call or email rep",terms:"COD",remitEmail:"",freeShipping:"No minimum",barcodes:"No",expiration:"N/A",address:"",notes:"Multiple reps — rotate contacts. COD only, bring checks."}
+];
 let _vendorExpanded = null;
-
-async function loadVendors() {
-  const body = document.getElementById('vendor-table-body');
-  if (body) body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(54,58,46,0.4);font-size:13px;">Loading vendors...</div>';
-  try {
-    const res = await fetch('https://effervescent-bienenstitch-c0ba8a.netlify.app/.netlify/functions/proxy?action=vendors_active');
-    const data = await res.json();
-    if (!data.ok || !Array.isArray(data.vendors)) throw new Error('Bad response');
-    _vendorData = data.vendors.map(v => ({
-      name: v.displayName || v.nickname || '',
-      nickname: v.nickname || '',
-      type: v.type || '',
-      sub: v.subcategory || '',
-      rep: v.salesRep || '',
-      raw: v
-    }));
-    renderVendorTable();
-  } catch (e) {
-    if (body) body.innerHTML = '<div style="padding:40px;text-align:center;color:#c44;font-size:13px;">Failed to load vendors: ' + e.message + '</div>';
-  }
-}
 
 function renderVendorTable() {
   const search = (document.getElementById('vendor-search').value || '').toLowerCase();
